@@ -7,9 +7,9 @@
 **Architecture:** Microservices communicating via Redis Streams — Frame Capture → Detection Bridge → Pipeline Core → Event Router, with a Next.js dashboard for configuration and real-time monitoring.
 
 **Tech Stack:**
-- Backend: .NET 8, C#, StackExchange.Redis, Npgsql/Dapper, OpenCvSharp4
+- Backend: .NET 10, C#, .NET Aspire, StackExchange.Redis, Npgsql/Dapper, OpenCvSharp4
 - Frontend: Next.js (App Router), TypeScript, Tailwind CSS, Prisma
-- Infrastructure: Redis (Streams + pub/sub), PostgreSQL, Docker Compose
+- Infrastructure: .NET Aspire (orchestration, service discovery, health checks, telemetry), Redis (Streams + pub/sub), PostgreSQL, Docker
 
 **Design doc:** `docs/plans/2026-03-06-openeye-framework-design.md`
 
@@ -21,6 +21,8 @@
 
 **Files:**
 - Create: `OpenEye.sln`
+- Create: `src/OpenEye.AppHost/OpenEye.AppHost.csproj` — Aspire orchestrator
+- Create: `src/OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj` — Aspire shared service defaults
 - Create: `src/OpenEye.Shared/OpenEye.Shared.csproj`
 - Create: `src/OpenEye.Abstractions/OpenEye.Abstractions.csproj`
 - Create: `src/OpenEye.PipelineCore/OpenEye.PipelineCore.csproj`
@@ -65,26 +67,32 @@ cd /home/user/openeye
 
 dotnet new sln -n OpenEye
 
+# Aspire orchestrator and service defaults
+dotnet new aspire-apphost -n OpenEye.AppHost -o src/OpenEye.AppHost -f net10.0
+dotnet new aspire-servicedefaults -n OpenEye.ServiceDefaults -o src/OpenEye.ServiceDefaults -f net10.0
+
 # Shared models library
-dotnet new classlib -n OpenEye.Shared -o src/OpenEye.Shared -f net8.0
+dotnet new classlib -n OpenEye.Shared -o src/OpenEye.Shared -f net10.0
 
 # Abstractions (interfaces)
-dotnet new classlib -n OpenEye.Abstractions -o src/OpenEye.Abstractions -f net8.0
+dotnet new classlib -n OpenEye.Abstractions -o src/OpenEye.Abstractions -f net10.0
 
 # Services (worker services)
-dotnet new worker -n OpenEye.PipelineCore -o src/OpenEye.PipelineCore -f net8.0
-dotnet new worker -n OpenEye.FrameCapture -o src/OpenEye.FrameCapture -f net8.0
-dotnet new worker -n OpenEye.DetectionBridge -o src/OpenEye.DetectionBridge -f net8.0
-dotnet new worker -n OpenEye.EventRouter -o src/OpenEye.EventRouter -f net8.0
+dotnet new worker -n OpenEye.PipelineCore -o src/OpenEye.PipelineCore -f net10.0
+dotnet new worker -n OpenEye.FrameCapture -o src/OpenEye.FrameCapture -f net10.0
+dotnet new worker -n OpenEye.DetectionBridge -o src/OpenEye.DetectionBridge -f net10.0
+dotnet new worker -n OpenEye.EventRouter -o src/OpenEye.EventRouter -f net10.0
 
 # Test projects
-dotnet new xunit -n OpenEye.Tests -o tests/OpenEye.Tests -f net8.0
-dotnet new xunit -n OpenEye.IntegrationTests -o tests/OpenEye.IntegrationTests -f net8.0
+dotnet new xunit -n OpenEye.Tests -o tests/OpenEye.Tests -f net10.0
+dotnet new xunit -n OpenEye.IntegrationTests -o tests/OpenEye.IntegrationTests -f net10.0
 ```
 
 **Step 3: Add all projects to solution**
 
 ```bash
+dotnet sln add src/OpenEye.AppHost/OpenEye.AppHost.csproj
+dotnet sln add src/OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj
 dotnet sln add src/OpenEye.Shared/OpenEye.Shared.csproj
 dotnet sln add src/OpenEye.Abstractions/OpenEye.Abstractions.csproj
 dotnet sln add src/OpenEye.PipelineCore/OpenEye.PipelineCore.csproj
@@ -101,15 +109,25 @@ dotnet sln add tests/OpenEye.IntegrationTests/OpenEye.IntegrationTests.csproj
 # Abstractions depends on Shared (for model types)
 dotnet add src/OpenEye.Abstractions reference src/OpenEye.Shared/OpenEye.Shared.csproj
 
-# All services depend on Shared + Abstractions
+# All services depend on Shared + Abstractions + ServiceDefaults
 dotnet add src/OpenEye.PipelineCore reference src/OpenEye.Shared/OpenEye.Shared.csproj
 dotnet add src/OpenEye.PipelineCore reference src/OpenEye.Abstractions/OpenEye.Abstractions.csproj
+dotnet add src/OpenEye.PipelineCore reference src/OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj
 dotnet add src/OpenEye.FrameCapture reference src/OpenEye.Shared/OpenEye.Shared.csproj
 dotnet add src/OpenEye.FrameCapture reference src/OpenEye.Abstractions/OpenEye.Abstractions.csproj
+dotnet add src/OpenEye.FrameCapture reference src/OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj
 dotnet add src/OpenEye.DetectionBridge reference src/OpenEye.Shared/OpenEye.Shared.csproj
 dotnet add src/OpenEye.DetectionBridge reference src/OpenEye.Abstractions/OpenEye.Abstractions.csproj
+dotnet add src/OpenEye.DetectionBridge reference src/OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj
 dotnet add src/OpenEye.EventRouter reference src/OpenEye.Shared/OpenEye.Shared.csproj
 dotnet add src/OpenEye.EventRouter reference src/OpenEye.Abstractions/OpenEye.Abstractions.csproj
+dotnet add src/OpenEye.EventRouter reference src/OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj
+
+# AppHost references all services (for orchestration)
+dotnet add src/OpenEye.AppHost reference src/OpenEye.PipelineCore/OpenEye.PipelineCore.csproj
+dotnet add src/OpenEye.AppHost reference src/OpenEye.FrameCapture/OpenEye.FrameCapture.csproj
+dotnet add src/OpenEye.AppHost reference src/OpenEye.DetectionBridge/OpenEye.DetectionBridge.csproj
+dotnet add src/OpenEye.AppHost reference src/OpenEye.EventRouter/OpenEye.EventRouter.csproj
 
 # Test projects reference everything they need
 dotnet add tests/OpenEye.Tests reference src/OpenEye.Shared/OpenEye.Shared.csproj
@@ -123,17 +141,62 @@ dotnet add tests/OpenEye.IntegrationTests reference src/OpenEye.PipelineCore/Ope
 **Step 5: Add NuGet dependencies**
 
 ```bash
-# Redis for all services
-dotnet add src/OpenEye.Shared package StackExchange.Redis
-dotnet add src/OpenEye.Shared package Npgsql
+# Aspire components for Redis and PostgreSQL (provides connection management, health checks, telemetry)
+dotnet add src/OpenEye.Shared package Aspire.StackExchange.Redis
+dotnet add src/OpenEye.Shared package Aspire.Npgsql
 dotnet add src/OpenEye.Shared package Dapper
+
+# Aspire hosting integrations for AppHost
+dotnet add src/OpenEye.AppHost package Aspire.Hosting.Redis
+dotnet add src/OpenEye.AppHost package Aspire.Hosting.PostgreSQL
+dotnet add src/OpenEye.AppHost package Aspire.Hosting.NodeJs
 
 # OpenCvSharp for frame capture only
 dotnet add src/OpenEye.FrameCapture package OpenCvSharp4
 dotnet add src/OpenEye.FrameCapture package OpenCvSharp4.runtime.linux-x64
 ```
 
-**Step 6: Delete placeholder files, verify build**
+**Step 6: Configure Aspire AppHost orchestration**
+
+Create `src/OpenEye.AppHost/Program.cs`:
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+// Infrastructure
+var redis = builder.AddRedis("redis");
+var postgres = builder.AddPostgres("postgres")
+    .AddDatabase("openeye");
+
+// Services
+var frameCapture = builder.AddProject<Projects.OpenEye_FrameCapture>("frame-capture")
+    .WithReference(redis)
+    .WithReference(postgres);
+
+var detectionBridge = builder.AddProject<Projects.OpenEye_DetectionBridge>("detection-bridge")
+    .WithReference(redis)
+    .WithReference(postgres);
+
+var pipelineCore = builder.AddProject<Projects.OpenEye_PipelineCore>("pipeline-core")
+    .WithReference(redis)
+    .WithReference(postgres);
+
+var eventRouter = builder.AddProject<Projects.OpenEye_EventRouter>("event-router")
+    .WithReference(redis)
+    .WithReference(postgres);
+
+// Dashboard (Next.js)
+var dashboard = builder.AddNpmApp("dashboard", "../../../dashboard")
+    .WithReference(postgres)
+    .WithHttpEndpoint(port: 3000, env: "PORT")
+    .WithExternalHttpEndpoints();
+
+builder.Build().Run();
+```
+
+Each service's `Program.cs` calls `builder.AddServiceDefaults()` to get Aspire's built-in health checks, OpenTelemetry, and service discovery. Redis and PostgreSQL connections are resolved automatically from Aspire's connection string injection — no manual configuration needed.
+
+**Step 7: Delete placeholder files, verify build**
 
 Delete all auto-generated `Class1.cs`, `Worker.cs`, `UnitTest1.cs` files.
 
@@ -144,10 +207,10 @@ dotnet test
 
 Expected: Build succeeds, 0 tests run.
 
-**Step 7: Commit**
+**Step 8: Commit**
 
 ```
-chore: scaffold multi-service solution with shared libraries and test projects
+chore: scaffold Aspire-based multi-service solution with shared libraries and test projects
 ```
 
 ---
@@ -347,12 +410,14 @@ feat: define abstractions and interfaces for all services and pipeline stages
 - Create: `src/OpenEye.Shared/Postgres/PostgresConfigProvider.cs`
 - Create: `src/OpenEye.Shared/Postgres/PostgresEventStore.cs`
 
+> **Note:** Redis (`IConnectionMultiplexer`) and PostgreSQL (`NpgsqlDataSource`) connections are injected automatically by Aspire's service defaults via `builder.AddRedisClient("redis")` and `builder.AddNpgsqlDataSource("openeye")` in each service's `Program.cs`. The helpers below accept these DI-injected instances — no manual connection string handling.
+
 **Step 1: Implement `RedisStreamPublisher`**
 
-Generic helper that publishes JSON-serialized messages to a Redis stream.
+Generic helper that publishes JSON-serialized messages to a Redis stream. Takes `IConnectionMultiplexer` via constructor DI.
 
 ```csharp
-public class RedisStreamPublisher
+public class RedisStreamPublisher(IConnectionMultiplexer redis)
 {
     Task PublishAsync<T>(string streamKey, T message, CancellationToken ct = default);
 }
@@ -1108,65 +1173,79 @@ feat: implement dashboard UI pages for cameras, zones, rules, events, and settin
 
 ## Phase 5: Infrastructure & Integration
 
-### Task 16: Docker Compose Setup
+### Task 16: Aspire Deployment & Container Support
 
 **Files:**
-- Create: `docker/docker-compose.yml`
-- Create: `docker/Dockerfile.dotnet`
-- Create: `docker/Dockerfile.dashboard`
-- Create: `docker/.env.example`
+- Update: `src/OpenEye.AppHost/Program.cs` — finalize with all resource configuration
+- Create: `docker/Dockerfile.dotnet` — for production container builds
+- Create: `docker/Dockerfile.dashboard` — for production Next.js build
+- Create: `.env.example`
 
-**Step 1: Create `Dockerfile.dotnet` (multi-stage)**
+> **Note:** For local development, .NET Aspire handles everything — `dotnet run --project src/OpenEye.AppHost` spins up Redis, PostgreSQL, all services, and the Aspire developer dashboard (with logs, traces, metrics, and health checks) automatically. No docker-compose needed for dev. The Dockerfiles below are only for production deployment.
+
+**Step 1: Finalize AppHost with Roboflow Inference container**
+
+Add the Roboflow Inference server as a container resource in `Program.cs`:
+
+```csharp
+var inference = builder.AddContainer("roboflow-inference", "roboflow/inference-server", "latest")
+    .WithHttpEndpoint(port: 9001, targetPort: 9001, name: "inference-api");
+
+var detectionBridge = builder.AddProject<Projects.OpenEye_DetectionBridge>("detection-bridge")
+    .WithReference(redis)
+    .WithReference(postgres)
+    .WithReference(inference.GetEndpoint("inference-api"));
+```
+
+Add volume mounts for frames and evidence:
+
+```csharp
+var frameCapture = builder.AddProject<Projects.OpenEye_FrameCapture>("frame-capture")
+    .WithReference(redis)
+    .WithReference(postgres)
+    .WithBindMount("../../volumes/frames", "/data/frames");
+```
+
+**Step 2: Create `Dockerfile.dotnet` (multi-stage, production)**
 
 ```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 # Restore, build, publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 # Copy published output, set entrypoint
 # ARG SERVICE_NAME to select which service to run
 ```
 
 Single Dockerfile for all C# services, parameterized by `SERVICE_NAME` build arg.
 
-**Step 2: Create `Dockerfile.dashboard`**
+**Step 3: Create `Dockerfile.dashboard` (production Next.js build)**
 
 Standard Next.js multi-stage build.
-
-**Step 3: Create `docker-compose.yml`**
-
-Services:
-- `redis` — `redis:7-alpine`, port 6379
-- `postgres` — `postgres:16-alpine`, port 5432, with init SQL for schema
-- `roboflow-inference` — `roboflow/inference-server:latest`, port 9001
-- `frame-capture` — builds from Dockerfile.dotnet with `SERVICE_NAME=OpenEye.FrameCapture`
-- `detection-bridge` — builds from Dockerfile.dotnet with `SERVICE_NAME=OpenEye.DetectionBridge`
-- `pipeline-core` — builds from Dockerfile.dotnet with `SERVICE_NAME=OpenEye.PipelineCore`
-- `event-router` — builds from Dockerfile.dotnet with `SERVICE_NAME=OpenEye.EventRouter`
-- `dashboard` — builds from Dockerfile.dashboard, port 3000
-
-Volumes: `frames`, `evidence`, `pgdata`
-
-Dependencies / startup order via `depends_on` with healthchecks:
-`redis, postgres` → `roboflow-inference` → `frame-capture, pipeline-core` → `detection-bridge` → `event-router` → `dashboard`
-
-Environment variables via `.env` file.
 
 **Step 4: Create `.env.example`**
 
 ```
+# Only needed for production — Aspire handles these automatically in dev
 POSTGRES_USER=openeye
 POSTGRES_PASSWORD=openeye
 POSTGRES_DB=openeye
-REDIS_URL=redis://redis:6379
 INFERENCE_URL=http://roboflow-inference:9001
 ROBOFLOW_MODEL_ID=yolov8n-640
 ```
 
-**Step 5: Commit**
+**Step 5: Aspire manifest for deployment**
+
+```bash
+dotnet run --project src/OpenEye.AppHost -- --publisher manifest --output-path aspire-manifest.json
+```
+
+This generates the deployment manifest that tools like `azd` (Azure Developer CLI) or Aspire-compatible deployers can consume.
+
+**Step 6: Commit**
 
 ```
-feat: add Docker Compose setup with all services and infrastructure
+feat: finalize Aspire orchestration and add production Dockerfiles
 ```
 
 ---
@@ -1266,10 +1345,12 @@ docs: add configuration examples for retail and warehouse scenarios
 | **2: Pipeline Core** | Tasks 5–9 | Tracker, zones, primitives, rules, orchestrator |
 | **3: Peripheral Services** | Tasks 10–12 | Frame capture, detection bridge, event router |
 | **4: Dashboard** | Tasks 13–15 | Next.js scaffolding, API routes, UI pages |
-| **5: Infrastructure** | Tasks 16–17 | Docker Compose, database schema |
+| **5: Infrastructure** | Tasks 16–17 | Aspire deployment, production Dockerfiles, database schema |
 | **6: Integration Testing** | Task 18 | Full pipeline scenarios, synthetic fixtures |
 | **7: Polish** | Task 19 | Examples, documentation |
 
 **Execution order:** Phases 1–2 are strictly sequential (each task builds on the last). Phase 3 tasks are independent of each other but depend on Phase 2. Phase 4 can begin in parallel with Phase 3. Phases 5–7 depend on all prior phases.
 
-**Testing approach:** TDD throughout — write tests first, then implement. Each task includes its own test step. Integration tests in Phase 6 validate the complete pipeline with realistic scenarios.
+**Local development:** Run `dotnet run --project src/OpenEye.AppHost` to launch the entire platform — Aspire automatically starts Redis, PostgreSQL, all C# services, and the Next.js dashboard, with a developer dashboard for logs, traces, metrics, and health monitoring.
+
+**Testing approach:** TDD throughout — write tests first, then implement. Each task includes its own test step. Integration tests in Phase 6 validate the complete pipeline with realistic scenarios. Aspire's `DistributedApplicationTestingBuilder` can be used for integration tests that need real Redis/PostgreSQL.
