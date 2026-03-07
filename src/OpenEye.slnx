@@ -1,12 +1,18 @@
 <Solution>
-  <Project Path="../tests/OpenEye.IntegrationTests/OpenEye.IntegrationTests.csproj" />
-  <Project Path="../tests/OpenEye.Tests/OpenEye.Tests.csproj" />
-  <Project Path="OpenEye.Abstractions/OpenEye.Abstractions.csproj" />
-  <Project Path="OpenEye.AppHost/OpenEye.AppHost.csproj" />
-  <Project Path="OpenEye.DetectionBridge/OpenEye.DetectionBridge.csproj" />
-  <Project Path="OpenEye.EventRouter/OpenEye.EventRouter.csproj" />
-  <Project Path="OpenEye.FrameCapture/OpenEye.FrameCapture.csproj" />
-  <Project Path="OpenEye.PipelineCore/OpenEye.PipelineCore.csproj" />
-  <Project Path="OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj" />
-  <Project Path="OpenEye.Shared/OpenEye.Shared.csproj" />
+  <Folder Name="/Common/">
+    <Project Path="OpenEye.Abstractions/OpenEye.Abstractions.csproj" />
+    <Project Path="OpenEye.ServiceDefaults/OpenEye.ServiceDefaults.csproj" />
+    <Project Path="OpenEye.Shared/OpenEye.Shared.csproj" />
+  </Folder>
+  <Folder Name="/Services/">
+    <Project Path="OpenEye.AppHost/OpenEye.AppHost.csproj" />
+    <Project Path="OpenEye.DetectionBridge/OpenEye.DetectionBridge.csproj" />
+    <Project Path="OpenEye.EventRouter/OpenEye.EventRouter.csproj" />
+    <Project Path="OpenEye.FrameCapture/OpenEye.FrameCapture.csproj" />
+    <Project Path="OpenEye.PipelineCore/OpenEye.PipelineCore.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="OpenEye.IntegrationTests/OpenEye.IntegrationTests.csproj" />
+    <Project Path="OpenEye.Tests/OpenEye.Tests.csproj" />
+  </Folder>
 </Solution>
