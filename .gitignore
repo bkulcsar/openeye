@@ -17,3 +17,12 @@ dashboard/.env.local
 # Runtime data
 frames/
 evidence/
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+
+# OS artifacts
+.DS_Store
+Thumbs.db
