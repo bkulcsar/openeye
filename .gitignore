@@ -1,6 +1,9 @@
 # Claude
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # .NET build artifacts
 bin/
 obj/
