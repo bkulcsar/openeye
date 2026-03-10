@@ -12,4 +12,5 @@ public record RuleDefinition(
     string Logic = "all",
     TimeSpan? Sustained = null,
     TimeSpan? Within = null,
-    int? MinOccurrences = null);
+    int? MinOccurrences = null,
+    EvidenceType? EvidenceType = null);

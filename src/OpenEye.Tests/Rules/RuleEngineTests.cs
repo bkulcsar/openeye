@@ -113,4 +113,64 @@ public class RuleEngineTests
         var events = engine.Evaluate(ctx, rules);
         Assert.Equal(2, events.Count);
     }
+
+    [Fact]
+    public void RuleWithEvidenceType_IncludesEvidenceRequestIdInMetadata()
+    {
+        var engine = MakeEngine();
+        var t = DateTimeOffset.UtcNow;
+        var ctx = new FrameContext
+        {
+            SourceId = "cam-1", Timestamp = t, Detections = [],
+            Tracks = [new TrackedObject
+            {
+                TrackId = "t1", ClassLabel = "person",
+                CurrentBox = new BoundingBox(0.5, 0.5, 0.1, 0.1),
+                FirstSeen = t, LastSeen = t
+            }],
+            ZoneResult = new ZoneEvaluationResult([], [],
+                [new ZonePresence { TrackId = "t1", ZoneId = "z1", EnteredAt = t.AddSeconds(-15) }])
+        };
+
+        var rules = new List<RuleDefinition>
+        {
+            new("rule-ev", "loitering", "person", "z1", null,
+                [new ConditionConfig("duration", ">", 10)], "emit_event",
+                EvidenceType: EvidenceType.Screenshot)
+        };
+
+        var events = engine.Evaluate(ctx, rules);
+        Assert.Single(events);
+        Assert.True(events[0].Metadata!.ContainsKey("evidenceRequestId"));
+        Assert.Equal("Screenshot", events[0].Metadata!["evidenceType"]);
+    }
+
+    [Fact]
+    public void RuleWithoutEvidenceType_DoesNotIncludeEvidenceRequestId()
+    {
+        var engine = MakeEngine();
+        var t = DateTimeOffset.UtcNow;
+        var ctx = new FrameContext
+        {
+            SourceId = "cam-1", Timestamp = t, Detections = [],
+            Tracks = [new TrackedObject
+            {
+                TrackId = "t1", ClassLabel = "person",
+                CurrentBox = new BoundingBox(0.5, 0.5, 0.1, 0.1),
+                FirstSeen = t, LastSeen = t
+            }],
+            ZoneResult = new ZoneEvaluationResult([], [],
+                [new ZonePresence { TrackId = "t1", ZoneId = "z1", EnteredAt = t.AddSeconds(-15) }])
+        };
+
+        var rules = new List<RuleDefinition>
+        {
+            new("rule-no-ev", "loitering", "person", "z1", null,
+                [new ConditionConfig("duration", ">", 10)], "emit_event")
+        };
+
+        var events = engine.Evaluate(ctx, rules);
+        Assert.Single(events);
+        Assert.False(events[0].Metadata!.ContainsKey("evidenceRequestId"));
+    }
 }

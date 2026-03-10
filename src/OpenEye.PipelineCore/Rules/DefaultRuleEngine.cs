@@ -58,15 +58,26 @@ public class DefaultRuleEngine(IConditionRegistry conditionRegistry, IRuleStateS
 
                 _deduplicator.RecordFired(rule.RuleId, track.TrackId, context.Timestamp);
 
+                var eventId = Guid.NewGuid().ToString();
+                var metadata = new Dictionary<string, object> { ["action"] = rule.Action };
+
+                if (rule.EvidenceType is not null)
+                {
+                    metadata["evidenceRequestId"] = Guid.NewGuid().ToString();
+                    metadata["evidenceFrom"] = context.Timestamp.AddSeconds(-10);
+                    metadata["evidenceTo"] = context.Timestamp.AddSeconds(5);
+                    metadata["evidenceType"] = rule.EvidenceType.Value.ToString();
+                }
+
                 events.Add(new Event(
-                    EventId: Guid.NewGuid().ToString(),
+                    EventId: eventId,
                     EventType: rule.Name,
                     Timestamp: context.Timestamp,
                     SourceId: context.SourceId,
                     ZoneId: rule.ZoneId,
                     TrackedObjects: [track],
                     RuleId: rule.RuleId,
-                    Metadata: new Dictionary<string, object> { ["action"] = rule.Action }
+                    Metadata: metadata
                 ));
             }
         }
