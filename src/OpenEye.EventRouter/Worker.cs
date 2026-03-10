@@ -28,15 +28,16 @@ public class Worker(
                     continue;
                 }
 
+                await using var conn = string.IsNullOrEmpty(connString) ? null : new NpgsqlConnection(connString);
+
                 foreach (var entry in entries)
                 {
                     var eventJson = entry["event"].ToString();
                     var evt = JsonSerializer.Deserialize<Event>(eventJson);
                     if (evt is null) continue;
 
-                    if (!string.IsNullOrEmpty(connString))
+                    if (conn is not null)
                     {
-                        await using var conn = new NpgsqlConnection(connString);
                         await conn.ExecuteAsync(
                             """
                             INSERT INTO events (event_id, event_type, timestamp, source_id, zone_id, rule_id, tracked_objects, metadata)

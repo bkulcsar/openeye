@@ -50,10 +50,13 @@ public class Worker(
                     var frameIndex = entry["frame_index"].ToString();
                     var timestamp = entry["timestamp"].ToString();
 
-                    var response = await httpClient.PostAsJsonAsync(
-                        $"{roboflowUrl}/{modelId}?api_key={roboflowApiKey}",
-                        new { image },
-                        ct);
+                    var request = new HttpRequestMessage(HttpMethod.Post, $"{roboflowUrl}/{modelId}")
+                    {
+                        Content = JsonContent.Create(new { image })
+                    };
+                    if (!string.IsNullOrEmpty(roboflowApiKey))
+                        request.Headers.Add("x-api-key", roboflowApiKey);
+                    var response = await httpClient.SendAsync(request, ct);
 
                     if (response.IsSuccessStatusCode)
                     {
