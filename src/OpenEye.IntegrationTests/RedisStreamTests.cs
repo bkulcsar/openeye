@@ -18,6 +18,11 @@ public class RedisStreamTests : IAsyncLifetime
         try
         {
             _redis = await ConnectionMultiplexer.ConnectAsync("localhost:6379,abortConnect=false,connectTimeout=2000");
+            if (!_redis.IsConnected)
+            {
+                _redis.Dispose();
+                _redis = null;
+            }
         }
         catch
         {
@@ -29,8 +34,12 @@ public class RedisStreamTests : IAsyncLifetime
     {
         if (_redis is not null)
         {
-            var db = _redis.GetDatabase();
-            await db.KeyDeleteAsync(TestStream);
+            try
+            {
+                var db = _redis.GetDatabase();
+                await db.KeyDeleteAsync(TestStream);
+            }
+            catch { }
             _redis.Dispose();
         }
     }
@@ -63,7 +72,7 @@ public class RedisStreamTests : IAsyncLifetime
     [Fact]
     public async Task Consumer_GroupAlreadyExists_DoesNotThrow()
     {
-        if (_redis is null) return;
+        if (_redis is null) return; // Skip if Redis not available
 
         var consumer1 = new RedisStreamConsumer(_redis, TestStream, "test-group-2", "consumer-a");
         var consumer2 = new RedisStreamConsumer(_redis, TestStream, "test-group-2", "consumer-b");
