@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
+import { updateZoneSchema } from "@/lib/validations";
 import { NextResponse } from "next/server";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +13,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await request.json();
-  const zone = await prisma.zone.update({ where: { id }, data: body });
+  const result = updateZoneSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
+  }
+  const zone = await prisma.zone.update({ where: { id }, data: result.data });
   await publishConfigChanged("zones");
   return NextResponse.json(zone);
 }

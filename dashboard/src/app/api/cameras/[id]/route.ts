@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
+import { updateCameraSchema } from "@/lib/validations";
 import { NextResponse } from "next/server";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,9 +16,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await request.json();
+  const result = updateCameraSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
+  }
   const camera = await prisma.camera.update({
     where: { id },
-    data: body,
+    data: result.data,
   });
   await publishConfigChanged("cameras");
   return NextResponse.json(camera);
