@@ -1,7 +1,7 @@
 using System.Text.Json;
 using OpenEye.PipelineCore.Pipeline;
+using OpenEye.Shared;
 using OpenEye.Shared.Models;
-using OpenEye.Shared.Postgres;
 using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
@@ -11,7 +11,7 @@ public class Worker(
     ILogger<Worker> logger,
     IConfiguration config,
     IConnectionMultiplexer redis,
-    PostgresConfigProvider configProvider,
+    IConfigProvider configProvider,
     RedisConfigNotifier configNotifier,
     PipelineOrchestrator orchestrator) : BackgroundService
 {

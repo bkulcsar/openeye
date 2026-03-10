@@ -17,6 +17,5 @@
     <ProjectReference Include="..\OpenEye.Shared\OpenEye.Shared.csproj" />
     <ProjectReference Include="..\OpenEye.Abstractions\OpenEye.Abstractions.csproj" />
     <ProjectReference Include="..\OpenEye.ServiceDefaults\OpenEye.ServiceDefaults.csproj" />
-    <ProjectReference Include="..\OpenEye.PipelineCore\OpenEye.PipelineCore.csproj" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using OpenEye.PipelineCore.Pipeline;
 using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 

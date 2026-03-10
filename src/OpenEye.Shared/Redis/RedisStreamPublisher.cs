@@ -1,6 +1,6 @@
 using StackExchange.Redis;
 
-namespace OpenEye.PipelineCore.Pipeline;
+namespace OpenEye.Shared.Redis;
 
 public class RedisStreamPublisher(IConnectionMultiplexer redis)
 {

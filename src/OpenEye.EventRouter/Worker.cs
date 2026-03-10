@@ -2,8 +2,8 @@ using System.Text.Json;
 using Dapper;
 using Npgsql;
 using OpenEye.Abstractions;
-using OpenEye.PipelineCore.Pipeline;
 using OpenEye.Shared.Models;
+using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
 namespace OpenEye.EventRouter;

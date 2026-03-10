@@ -1,5 +1,5 @@
 using OpenCvSharp;
-using OpenEye.PipelineCore.Pipeline;
+using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
 namespace OpenEye.FrameCapture;

@@ -1,4 +1,4 @@
-using OpenEye.PipelineCore.Pipeline;
+using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
 namespace OpenEye.IntegrationTests;
