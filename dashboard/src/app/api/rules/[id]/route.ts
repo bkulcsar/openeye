@@ -1,0 +1,22 @@
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const rule = await prisma.rule.findUnique({ where: { id } });
+  if (!rule) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(rule);
+}
+
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await request.json();
+  const rule = await prisma.rule.update({ where: { id }, data: body });
+  return NextResponse.json(rule);
+}
+
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await prisma.rule.delete({ where: { id } });
+  return NextResponse.json({ deleted: true });
+}
