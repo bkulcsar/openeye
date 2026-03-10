@@ -1,5 +1,8 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using OpenEye.PipelineCore.Pipeline;
+using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
 namespace OpenEye.DetectionBridge;
@@ -10,6 +13,8 @@ public class Worker(
     IConnectionMultiplexer redis,
     IHttpClientFactory httpClientFactory) : BackgroundService
 {
+    private volatile IReadOnlySet<string> _classFilter = new HashSet<string>();
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var cameraIds = config.GetSection("CameraIds").Get<string[]>() ?? [];
@@ -20,8 +25,47 @@ public class Worker(
             return;
         }
 
-        var tasks = cameraIds.Select(id => ConsumeLoop(id, stoppingToken));
-        await Task.WhenAll(tasks);
+        var notifier = new RedisConfigNotifier(redis);
+        _classFilter = await notifier.GetClassFilterAsync(stoppingToken);
+        logger.LogInformation("Loaded class filter: {Classes}", string.Join(", ", _classFilter));
+
+        var configTask = WatchConfigChanges(notifier, stoppingToken);
+        var consumeTasks = cameraIds.Select(id => ConsumeLoop(id, stoppingToken));
+        await Task.WhenAll(consumeTasks.Append(configTask));
+    }
+
+    private async Task WatchConfigChanges(RedisConfigNotifier notifier, CancellationToken ct)
+    {
+        await foreach (var section in notifier.SubscribeAsync(ct))
+        {
+            if (section == "class-filter")
+            {
+                _classFilter = await notifier.GetClassFilterAsync(ct);
+                logger.LogInformation("Reloaded class filter: {Classes}", string.Join(", ", _classFilter));
+            }
+        }
+    }
+
+    private string ApplyClassFilter(string detectionsJson)
+    {
+        var filter = _classFilter;
+        if (filter.Count == 0)
+            return detectionsJson;
+
+        var doc = JsonNode.Parse(detectionsJson);
+        if (doc?["predictions"] is JsonArray predictions)
+        {
+            var filtered = new JsonArray();
+            foreach (var pred in predictions)
+            {
+                var cls = pred?["class"]?.GetValue<string>();
+                if (cls != null && filter.Contains(cls))
+                    filtered.Add(pred!.DeepClone());
+            }
+            doc["predictions"] = filtered;
+            return doc.ToJsonString();
+        }
+        return detectionsJson;
     }
 
     private async Task ConsumeLoop(string cameraId, CancellationToken ct)
@@ -61,12 +105,13 @@ public class Worker(
                     if (response.IsSuccessStatusCode)
                     {
                         var result = await response.Content.ReadAsStringAsync(ct);
+                        var filtered = ApplyClassFilter(result);
                         await publisher.PublishAsync($"detections:{cameraId}", new Dictionary<string, string>
                         {
                             ["camera_id"] = cameraId,
                             ["frame_index"] = frameIndex,
                             ["timestamp"] = timestamp,
-                            ["detections"] = result
+                            ["detections"] = filtered
                         });
                     }
                     else
