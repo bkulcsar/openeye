@@ -11,10 +11,13 @@ public class PipelineOrchestrator(
     IPrimitiveExtractor primitiveExtractor,
     IRuleEngine ruleEngine)
 {
-    private IReadOnlyList<Zone> _zones = [];
-    private IReadOnlyList<Tripwire> _tripwires = [];
-    private IReadOnlyList<PrimitiveConfig> _primitiveConfigs = [];
-    private IReadOnlyList<RuleDefinition> _rules = [];
+    private sealed record PipelineConfig(
+        IReadOnlyList<Zone> Zones,
+        IReadOnlyList<Tripwire> Tripwires,
+        IReadOnlyList<PrimitiveConfig> PrimitiveConfigs,
+        IReadOnlyList<RuleDefinition> Rules);
+
+    private volatile PipelineConfig _config = new([], [], [], []);
 
     public void ReloadConfig(
         IReadOnlyList<Zone> zones,
@@ -22,15 +25,14 @@ public class PipelineOrchestrator(
         IReadOnlyList<PrimitiveConfig> primitiveConfigs,
         IReadOnlyList<RuleDefinition> rules)
     {
-        _zones = zones;
-        _tripwires = tripwires;
-        _primitiveConfigs = primitiveConfigs;
-        _rules = rules;
+        _config = new PipelineConfig(zones, tripwires, primitiveConfigs, rules);
     }
 
     public IReadOnlyList<Event> ProcessFrame(
         string cameraId, IReadOnlyList<Detection> detections, DateTimeOffset timestamp)
     {
+        var cfg = _config; // capture once for consistent snapshot
+
         var context = new FrameContext
         {
             SourceId = cameraId,
@@ -42,26 +44,27 @@ public class PipelineOrchestrator(
         context.Tracks = tracker.Update(detections, timestamp);
 
         // Stage 2: Zone Evaluation
-        context.ZoneResult = zoneEvaluator.Evaluate(context.Tracks, _zones, _tripwires);
+        context.ZoneResult = zoneEvaluator.Evaluate(context.Tracks, cfg.Zones, cfg.Tripwires);
 
-        // Stage 3: Feature Extraction
+        // Stage 3: Feature Extraction → Feature Store
         foreach (var extractor in featureExtractors)
             extractor.Update(context);
 
-        // Stage 4: Primitive Extraction
-        context.Primitives = primitiveExtractor.Extract(context, _primitiveConfigs);
+        // Stage 4: Primitive Extraction (reads from Feature Store)
+        context.Primitives = primitiveExtractor.Extract(context, cfg.PrimitiveConfigs);
 
-        // Stage 5: Rule Evaluation
-        context.Events = ruleEngine.Evaluate(context, _rules);
+        // Stage 5: Rule Evaluation (plugin conditions read from context)
+        context.Events = ruleEngine.Evaluate(context, cfg.Rules);
 
         return context.Events;
     }
 
     public IReadOnlySet<string> GetRequiredClasses()
     {
+        var cfg = _config; // capture once
         var classes = new HashSet<string>();
-        foreach (var p in _primitiveConfigs) classes.Add(p.ClassLabel);
-        foreach (var r in _rules) classes.Add(r.ObjectClass);
+        foreach (var p in cfg.PrimitiveConfigs) classes.Add(p.ClassLabel);
+        foreach (var r in cfg.Rules) classes.Add(r.ObjectClass);
         return classes;
     }
 }
