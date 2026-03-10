@@ -1,3 +1,4 @@
+using Npgsql;
 using OpenEye.Abstractions;
 using OpenEye.PipelineCore;
 using OpenEye.PipelineCore.Features;
@@ -7,6 +8,8 @@ using OpenEye.PipelineCore.Rules;
 using OpenEye.PipelineCore.Rules.Conditions;
 using OpenEye.PipelineCore.Tracking;
 using OpenEye.PipelineCore.Zones;
+using OpenEye.Shared.Postgres;
+using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -14,6 +17,11 @@ builder.AddServiceDefaults();
 
 var redisConn = builder.Configuration.GetConnectionString("redis") ?? "localhost:6379";
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConn));
+
+var pgConn = builder.Configuration.GetConnectionString("openeye") ?? "";
+builder.Services.AddSingleton(NpgsqlDataSource.Create(pgConn));
+builder.Services.AddSingleton<PostgresConfigProvider>();
+builder.Services.AddSingleton<RedisConfigNotifier>();
 
 // Tracking
 builder.Services.AddSingleton<IObjectTracker, SortTracker>();

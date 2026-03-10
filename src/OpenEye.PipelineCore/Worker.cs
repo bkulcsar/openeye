@@ -1,6 +1,8 @@
 using System.Text.Json;
 using OpenEye.PipelineCore.Pipeline;
 using OpenEye.Shared.Models;
+using OpenEye.Shared.Postgres;
+using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
 namespace OpenEye.PipelineCore;
@@ -9,6 +11,8 @@ public class Worker(
     ILogger<Worker> logger,
     IConfiguration config,
     IConnectionMultiplexer redis,
+    PostgresConfigProvider configProvider,
+    RedisConfigNotifier configNotifier,
     PipelineOrchestrator orchestrator) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -21,13 +25,55 @@ public class Worker(
             return;
         }
 
+        // Load initial config from database
+        await ReloadPipelineConfigAsync(stoppingToken);
+
         // Publish required class filter to Redis
-        var classFilter = orchestrator.GetRequiredClasses();
-        var db = redis.GetDatabase();
-        await db.StringSetAsync("config:class-filter", JsonSerializer.Serialize(classFilter));
+        await PublishClassFilterAsync();
+
+        // Start config reload listener in background
+        _ = ListenForConfigChangesAsync(stoppingToken);
 
         var tasks = cameraIds.Select(id => ConsumeLoop(id, stoppingToken));
         await Task.WhenAll(tasks);
+    }
+
+    private async Task ReloadPipelineConfigAsync(CancellationToken ct)
+    {
+        var zones = await configProvider.GetZonesAsync(ct: ct);
+        var tripwires = await configProvider.GetTripwiresAsync(ct: ct);
+        var primitives = await configProvider.GetPrimitivesAsync(ct: ct);
+        var rules = await configProvider.GetRulesAsync(ct);
+        orchestrator.ReloadConfig(zones, tripwires, primitives, rules);
+    }
+
+    private async Task PublishClassFilterAsync()
+    {
+        var classFilter = orchestrator.GetRequiredClasses();
+        var db = redis.GetDatabase();
+        await db.StringSetAsync("config:class-filter", JsonSerializer.Serialize(classFilter));
+    }
+
+    private async Task ListenForConfigChangesAsync(CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var section in configNotifier.SubscribeAsync(ct))
+            {
+                logger.LogInformation("Config change received ({Section}), reloading pipeline config", section);
+                try
+                {
+                    await ReloadPipelineConfigAsync(ct);
+                    await PublishClassFilterAsync();
+                    logger.LogInformation("Pipeline config reloaded successfully");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to reload pipeline config");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
     private async Task ConsumeLoop(string cameraId, CancellationToken ct)
