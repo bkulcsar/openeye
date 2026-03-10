@@ -12,11 +12,13 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260302" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260302" />
+    <PackageReference Include="StackExchange.Redis" Version="2.11.8" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpenEye.Shared\OpenEye.Shared.csproj" />
     <ProjectReference Include="..\OpenEye.Abstractions\OpenEye.Abstractions.csproj" />
     <ProjectReference Include="..\OpenEye.ServiceDefaults\OpenEye.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\OpenEye.PipelineCore\OpenEye.PipelineCore.csproj" />
   </ItemGroup>
 </Project>

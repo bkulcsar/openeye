@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Camera {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  targetFps Int      @default(5) @map("target_fps")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  zones     Zone[]
+  rules     Rule[]
+
+  @@map("cameras")
+}
+
+model Zone {
+  id       String @id @default(cuid())
+  name     String
+  cameraId String @map("camera_id")
+  camera   Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  polygon  Json
+  type     String @default("zone")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("zones")
+}
+
+model Rule {
+  id          String  @id @default(cuid())
+  name        String
+  cameraId    String  @map("camera_id")
+  camera      Camera  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  objectClass String  @map("object_class")
+  zoneId      String? @map("zone_id")
+  enabled     Boolean @default(true)
+
+  conditions Json
+  logic      String @default("all")
+  cooldown   Int    @default(30)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("rules")
+}
+
+model Event {
+  id             String   @id @map("event_id")
+  eventType      String   @map("event_type")
+  timestamp      DateTime
+  sourceId       String   @map("source_id")
+  zoneId         String?  @map("zone_id")
+  ruleId         String   @map("rule_id")
+  trackedObjects Json     @map("tracked_objects")
+  metadata       Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("events")
+}

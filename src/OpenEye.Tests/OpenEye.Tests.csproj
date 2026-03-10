@@ -22,6 +22,9 @@
     <ProjectReference Include="..\..\src\OpenEye.Shared\OpenEye.Shared.csproj" />
     <ProjectReference Include="..\..\src\OpenEye.Abstractions\OpenEye.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\OpenEye.PipelineCore\OpenEye.PipelineCore.csproj" />
+    <ProjectReference Include="..\..\src\OpenEye.FrameCapture\OpenEye.FrameCapture.csproj" />
+    <ProjectReference Include="..\..\src\OpenEye.DetectionBridge\OpenEye.DetectionBridge.csproj" />
+    <ProjectReference Include="..\..\src\OpenEye.EventRouter\OpenEye.EventRouter.csproj" />
   </ItemGroup>
 
 </Project>
