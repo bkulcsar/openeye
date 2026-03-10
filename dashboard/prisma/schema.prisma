@@ -10,7 +10,8 @@ datasource db {
 model Camera {
   id        String   @id @default(cuid())
   name      String
-  url       String
+  url       String   @map("stream_url")
+  type      String   @default("rtsp")
   targetFps Int      @default(5) @map("target_fps")
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
@@ -22,9 +23,9 @@ model Camera {
 }
 
 model Zone {
-  id       String @id @default(cuid())
+  id       String @id @default(cuid()) @map("zone_id")
   name     String
-  cameraId String @map("camera_id")
+  cameraId String @map("source_id")
   camera   Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
   polygon  Json
   type     String @default("zone")
@@ -36,22 +37,61 @@ model Zone {
 }
 
 model Rule {
-  id          String  @id @default(cuid())
+  id          String  @id @default(cuid()) @map("rule_id")
   name        String
   cameraId    String  @map("camera_id")
   camera      Camera  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
   objectClass String  @map("object_class")
   zoneId      String? @map("zone_id")
+  tripwireId  String? @map("tripwire_id")
   enabled     Boolean @default(true)
 
   conditions Json
   logic      String @default("all")
-  cooldown   Int    @default(30)
+  cooldown   Int    @default(30) @map("cooldown_seconds")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("rules")
+}
+
+model Tripwire {
+  id       String @id @default(cuid()) @map("tripwire_id")
+  sourceId String @map("source_id")
+  startX   Float  @map("start_x")
+  startY   Float  @map("start_y")
+  endX     Float  @map("end_x")
+  endY     Float  @map("end_y")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tripwires")
+}
+
+model PrimitiveConfig {
+  name       String  @id
+  type       String
+  classLabel String  @map("class_label")
+  zoneId     String? @map("zone_id")
+  tripwireId String? @map("tripwire_id")
+  sourceId   String  @map("source_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("primitive_configs")
+}
+
+model NotificationConfig {
+  ruleId   String @id @map("rule_id")
+  channels Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_configs")
 }
 
 model Event {
