@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { publishConfigChanged } from "@/lib/redis";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -21,5 +22,6 @@ export async function POST(request: Request) {
       type: body.type ?? "zone",
     },
   });
+  await publishConfigChanged("zones");
   return NextResponse.json(zone, { status: 201 });
 }

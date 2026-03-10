@@ -50,6 +50,11 @@ model Rule {
   logic      String @default("all")
   cooldown   Int    @default(30) @map("cooldown_seconds")
 
+  sustained      Float?  @map("sustained_seconds")
+  within         Float?  @map("within_seconds")
+  minOccurrences Int?    @map("min_occurrences")
+  evidenceType   String? @map("evidence_type")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

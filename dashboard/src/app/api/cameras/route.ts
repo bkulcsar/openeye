@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { publishConfigChanged } from "@/lib/redis";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -19,5 +20,6 @@ export async function POST(request: Request) {
       enabled: body.enabled ?? true,
     },
   });
+  await publishConfigChanged("cameras");
   return NextResponse.json(camera, { status: 201 });
 }

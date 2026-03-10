@@ -1,6 +1,7 @@
 using Npgsql;
 using OpenEye.Abstractions;
 using OpenEye.PipelineCore;
+using OpenEye.Shared;
 using OpenEye.PipelineCore.Features;
 using OpenEye.PipelineCore.Pipeline;
 using OpenEye.PipelineCore.Primitives;
@@ -21,6 +22,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Conn
 var pgConn = builder.Configuration.GetConnectionString("openeye") ?? "";
 builder.Services.AddSingleton(NpgsqlDataSource.Create(pgConn));
 builder.Services.AddSingleton<PostgresConfigProvider>();
+builder.Services.AddSingleton<IConfigProvider>(sp => sp.GetRequiredService<PostgresConfigProvider>());
 builder.Services.AddSingleton<RedisConfigNotifier>();
 
 // Tracking

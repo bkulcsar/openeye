@@ -121,7 +121,7 @@ public class Worker(
         }
     }
 
-    private static List<Detection> ParseDetections(string json, string sourceId, DateTimeOffset timestamp, long frameIndex)
+    private List<Detection> ParseDetections(string json, string sourceId, DateTimeOffset timestamp, long frameIndex)
     {
         var detections = new List<Detection>();
         try
@@ -142,7 +142,7 @@ public class Worker(
                 }
             }
         }
-        catch { /* ignore parse errors */ }
+        catch (Exception ex) { logger.LogWarning(ex, "Failed to parse detections JSON for {SourceId}", sourceId); }
         return detections;
     }
 }

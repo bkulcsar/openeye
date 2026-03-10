@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS rules (
     conditions       JSONB NOT NULL DEFAULT '[]',
     logic            TEXT NOT NULL DEFAULT 'all',
     cooldown_seconds INT NOT NULL DEFAULT 30,
+    sustained_seconds DOUBLE PRECISION,
+    within_seconds   DOUBLE PRECISION,
+    min_occurrences  INT,
+    evidence_type    TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -5,7 +5,7 @@ using OpenEye.Shared.Models;
 
 namespace OpenEye.Shared.Postgres;
 
-public class PostgresConfigProvider(NpgsqlDataSource dataSource)
+public class PostgresConfigProvider(NpgsqlDataSource dataSource) : IConfigProvider
 {
     public async Task<IReadOnlyList<CameraConfig>> GetCamerasAsync(CancellationToken ct = default)
     {
@@ -67,7 +67,7 @@ public class PostgresConfigProvider(NpgsqlDataSource dataSource)
     {
         await using var conn = await dataSource.OpenConnectionAsync(ct);
         var rows = await conn.QueryAsync<dynamic>(
-            "SELECT rule_id, name, object_class, zone_id, conditions, logic, cooldown_seconds, tripwire_id FROM rules");
+            "SELECT rule_id, name, object_class, zone_id, conditions, logic, cooldown_seconds, tripwire_id, sustained_seconds, within_seconds, min_occurrences, evidence_type FROM rules");
         return rows.Select(r => new RuleDefinition(
             (string)r.rule_id,
             (string)r.name,
@@ -75,7 +75,12 @@ public class PostgresConfigProvider(NpgsqlDataSource dataSource)
             (string?)r.zone_id,
             (string?)r.tripwire_id,
             JsonSerializer.Deserialize<List<ConditionConfig>>((string)r.conditions) ?? [],
-            Logic: (string?)r.logic ?? "all"
+            Logic: (string?)r.logic ?? "all",
+            Cooldown: r.cooldown_seconds is int cs ? TimeSpan.FromSeconds(cs) : null,
+            Sustained: r.sustained_seconds is double ss ? TimeSpan.FromSeconds(ss) : null,
+            Within: r.within_seconds is double ws ? TimeSpan.FromSeconds(ws) : null,
+            MinOccurrences: (int?)r.min_occurrences,
+            EvidenceType: r.evidence_type is string et ? Enum.Parse<EvidenceType>(et) : null
         )).ToList();
     }
 

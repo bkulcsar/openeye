@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { publishConfigChanged } from "@/lib/redis";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -25,5 +26,6 @@ export async function POST(request: Request) {
       cooldown: body.cooldown ?? 30,
     },
   });
+  await publishConfigChanged("rules");
   return NextResponse.json(rule, { status: 201 });
 }
