@@ -1,16 +1,85 @@
+using System.Net.Http.Json;
+using OpenEye.PipelineCore.Pipeline;
+using StackExchange.Redis;
+
 namespace OpenEye.DetectionBridge;
 
-public class Worker(ILogger<Worker> logger) : BackgroundService
+public class Worker(
+    ILogger<Worker> logger,
+    IConfiguration config,
+    IConnectionMultiplexer redis,
+    IHttpClientFactory httpClientFactory) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        var cameraIds = config.GetSection("CameraIds").Get<string[]>() ?? [];
+        if (cameraIds.Length == 0)
         {
-            if (logger.IsEnabled(LogLevel.Information))
+            logger.LogWarning("No camera IDs configured. Waiting...");
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+            return;
+        }
+
+        var tasks = cameraIds.Select(id => ConsumeLoop(id, stoppingToken));
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task ConsumeLoop(string cameraId, CancellationToken ct)
+    {
+        var consumer = new RedisStreamConsumer(redis, $"frames:{cameraId}", "detection-bridge", $"worker-{cameraId}");
+        var publisher = new RedisStreamPublisher(redis);
+        var roboflowUrl = config["Roboflow:Url"] ?? "http://localhost:9001";
+        var roboflowApiKey = config["Roboflow:ApiKey"] ?? "";
+        var modelId = config["Roboflow:ModelId"] ?? "yolov8n-640";
+        var httpClient = httpClientFactory.CreateClient();
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
             {
-                logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                var entries = await consumer.ReadAsync(1);
+                if (entries.Length == 0)
+                {
+                    await Task.Delay(50, ct);
+                    continue;
+                }
+
+                foreach (var entry in entries)
+                {
+                    var image = entry["image"].ToString();
+                    var frameIndex = entry["frame_index"].ToString();
+                    var timestamp = entry["timestamp"].ToString();
+
+                    var response = await httpClient.PostAsJsonAsync(
+                        $"{roboflowUrl}/{modelId}?api_key={roboflowApiKey}",
+                        new { image },
+                        ct);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadAsStringAsync(ct);
+                        await publisher.PublishAsync($"detections:{cameraId}", new Dictionary<string, string>
+                        {
+                            ["camera_id"] = cameraId,
+                            ["frame_index"] = frameIndex,
+                            ["timestamp"] = timestamp,
+                            ["detections"] = result
+                        });
+                    }
+                    else
+                    {
+                        logger.LogWarning("Roboflow returned {Status} for camera {Camera}",
+                            response.StatusCode, cameraId);
+                    }
+
+                    await consumer.AcknowledgeAsync(entry.Id);
+                }
             }
-            await Task.Delay(1000, stoppingToken);
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                logger.LogError(ex, "Error processing frames for {CameraId}", cameraId);
+                await Task.Delay(1000, ct);
+            }
         }
     }
 }
