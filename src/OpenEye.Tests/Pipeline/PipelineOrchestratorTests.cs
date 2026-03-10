@@ -14,21 +14,19 @@ public class PipelineOrchestratorTests
 {
     private static PipelineOrchestrator MakeOrchestrator()
     {
-        var tracker = new SortTracker();
-        var zoneEval = new DefaultZoneEvaluator();
-        var featureExtractors = new IFeatureExtractor[]
-        {
-            new ObjectFeatureExtractor(), new ZoneFeatureExtractor(), new TemporalFeatureExtractor()
-        };
-        var primitiveExtractor = new DefaultPrimitiveExtractor();
         var conditions = new IRuleCondition[]
         {
             new DurationCondition(), new CountAboveCondition(),
             new LineCrossCondition(), new SpeedCondition(),
             new PresenceCondition(), new AbsenceCondition()
         };
-        var ruleEngine = new DefaultRuleEngine(new ConditionRegistry(conditions), new InMemoryRuleStateStore());
-        return new PipelineOrchestrator(tracker, zoneEval, featureExtractors, primitiveExtractor, ruleEngine);
+        var conditionRegistry = new ConditionRegistry(conditions);
+        var sharedExtractors = new IFeatureExtractor[]
+        {
+            new ObjectFeatureExtractor(), new ZoneFeatureExtractor()
+        };
+        var primitiveExtractor = new DefaultPrimitiveExtractor();
+        return new PipelineOrchestrator(conditionRegistry, sharedExtractors, primitiveExtractor);
     }
 
     [Fact]

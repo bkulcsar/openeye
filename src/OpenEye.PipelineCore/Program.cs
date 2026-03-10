@@ -7,8 +7,6 @@ using OpenEye.PipelineCore.Pipeline;
 using OpenEye.PipelineCore.Primitives;
 using OpenEye.PipelineCore.Rules;
 using OpenEye.PipelineCore.Rules.Conditions;
-using OpenEye.PipelineCore.Tracking;
-using OpenEye.PipelineCore.Zones;
 using OpenEye.Shared.Postgres;
 using OpenEye.Shared.Redis;
 using StackExchange.Redis;
@@ -25,21 +23,14 @@ builder.Services.AddSingleton<PostgresConfigProvider>();
 builder.Services.AddSingleton<IConfigProvider>(sp => sp.GetRequiredService<PostgresConfigProvider>());
 builder.Services.AddSingleton<RedisConfigNotifier>();
 
-// Tracking
-builder.Services.AddSingleton<IObjectTracker, SortTracker>();
-
-// Zone evaluation
-builder.Services.AddSingleton<IZoneEvaluator, DefaultZoneEvaluator>();
-
-// Feature extractors (registered as IEnumerable<IFeatureExtractor> via multiple registrations)
+// Feature extractors (stateless — shared across cameras)
 builder.Services.AddSingleton<IFeatureExtractor, ObjectFeatureExtractor>();
 builder.Services.AddSingleton<IFeatureExtractor, ZoneFeatureExtractor>();
-builder.Services.AddSingleton<IFeatureExtractor, TemporalFeatureExtractor>();
 
-// Primitive extraction
+// Primitive extraction (stateless)
 builder.Services.AddSingleton<IPrimitiveExtractor, DefaultPrimitiveExtractor>();
 
-// Rule conditions
+// Rule conditions (stateless — needed to build per-camera rule engines)
 builder.Services.AddSingleton<IRuleCondition, DurationCondition>();
 builder.Services.AddSingleton<IRuleCondition, CountAboveCondition>();
 builder.Services.AddSingleton<IRuleCondition, LineCrossCondition>();
@@ -49,11 +40,7 @@ builder.Services.AddSingleton<IRuleCondition, AbsenceCondition>();
 builder.Services.AddSingleton<IConditionRegistry>(sp =>
     new ConditionRegistry(sp.GetServices<IRuleCondition>()));
 
-// Rule engine
-builder.Services.AddSingleton<IRuleStateStore, InMemoryRuleStateStore>();
-builder.Services.AddSingleton<IRuleEngine, DefaultRuleEngine>();
-
-// Pipeline
+// Pipeline (stateful per-camera state is managed inside PipelineOrchestrator)
 builder.Services.AddSingleton<IGlobalEventBus, LocalEventBus>();
 builder.Services.AddSingleton<PipelineOrchestrator>();
 builder.Services.AddHostedService<Worker>();

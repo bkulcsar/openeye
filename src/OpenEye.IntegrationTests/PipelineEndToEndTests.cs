@@ -17,15 +17,6 @@ public class PipelineEndToEndTests
         IReadOnlyList<PrimitiveConfig> primitiveConfigs,
         IReadOnlyList<RuleDefinition> rules)
     {
-        var tracker = new SortTracker();
-        var zoneEvaluator = new DefaultZoneEvaluator();
-        var featureExtractors = new IFeatureExtractor[]
-        {
-            new ObjectFeatureExtractor(),
-            new ZoneFeatureExtractor(),
-            new TemporalFeatureExtractor()
-        };
-        var primitiveExtractor = new DefaultPrimitiveExtractor();
         var conditions = new IRuleCondition[]
         {
             new DurationCondition(),
@@ -36,11 +27,15 @@ public class PipelineEndToEndTests
             new AbsenceCondition()
         };
         var conditionRegistry = new ConditionRegistry(conditions);
-        var stateStore = new InMemoryRuleStateStore();
-        var ruleEngine = new DefaultRuleEngine(conditionRegistry, stateStore);
+        var sharedExtractors = new IFeatureExtractor[]
+        {
+            new ObjectFeatureExtractor(),
+            new ZoneFeatureExtractor()
+        };
+        var primitiveExtractor = new DefaultPrimitiveExtractor();
 
         var orchestrator = new PipelineOrchestrator(
-            tracker, zoneEvaluator, featureExtractors, primitiveExtractor, ruleEngine);
+            conditionRegistry, sharedExtractors, primitiveExtractor);
         orchestrator.ReloadConfig(zones, [], primitiveConfigs, rules);
         return orchestrator;
     }
