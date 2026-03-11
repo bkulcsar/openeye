@@ -29,37 +29,32 @@ Camera Streams ─▶ Frame Capture ─▶ Detection Bridge ─▶ Pipeline Core
 
 ## Local Development
 
-For local development, services run natively with .NET Aspire orchestrating the backend and Next.js dev server for the dashboard. Only infrastructure (Redis, PostgreSQL, Roboflow Inference) runs in Docker.
+For local development, .NET Aspire orchestrates backend services, Redis, PostgreSQL, and the dashboard. Roboflow Inference runs via Docker Compose.
 
-### 1. Start infrastructure
+### 1. Start Roboflow Inference
 
 ```bash
 cd docker
-docker compose up -d redis postgres roboflow-inference
+docker compose up -d roboflow-inference
 ```
 
-This starts the infrastructure dependencies: Redis, PostgreSQL (with schema from `init.sql`), and Roboflow Inference.
-
-### 2. Set up the dashboard
+### 2. Install dashboard dependencies
 
 ```bash
 cd dashboard
 npm install
-npx prisma generate
-npx prisma db push
-npm run dev
 ```
 
-Dashboard is available at **http://localhost:3000**.
-
-### 3. Run backend services via Aspire
+### 3. Run everything via Aspire
 
 ```bash
 cd src
 dotnet run --project OpenEye.AppHost
 ```
 
-The Aspire dashboard opens automatically with health monitoring for all services. Connection strings are injected automatically.
+Aspire automatically starts Redis, PostgreSQL (with schema from `docker/init.sql`), and all backend services. The Aspire dashboard opens automatically with health monitoring.
+
+Dashboard is available at **http://localhost:3000**.
 
 ### 4. Configure cameras
 

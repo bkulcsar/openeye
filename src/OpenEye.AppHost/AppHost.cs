@@ -2,6 +2,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var redis = builder.AddRedis("redis");
 var postgres = builder.AddPostgres("postgres")
+    .WithEnvironment("POSTGRES_DB", "openeye")
+    .WithInitFiles("../../docker/init.sql")
     .AddDatabase("openeye");
 
 builder.AddProject<Projects.OpenEye_FrameCapture>("frame-capture")
@@ -24,11 +26,9 @@ builder.AddProject<Projects.OpenEye_EventRouter>("event-router")
     .WaitFor(redis)
     .WaitFor(postgres);
 
-builder.AddNpmApp("dashboard", "../../dashboard", "dev")
+builder.AddViteApp("dashboard", "../../dashboard", "dev")
     .WithReference(postgres)
     .WithReference(redis)
-    .WithHttpEndpoint(port: 3000, env: "PORT")
-    .WithExternalHttpEndpoints()
     .WaitFor(postgres);
 
 builder.Build().Run();
