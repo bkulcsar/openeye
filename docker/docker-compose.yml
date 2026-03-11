@@ -1,6 +1,6 @@
 # docker/docker-compose.yml
-# Fallback for running without .NET Aspire (e.g., CI, production)
-version: "3.9"
+# Standalone Docker Compose for OpenEye platform.
+# For development, use .NET Aspire AppHost instead.
 
 services:
   redis:
@@ -15,11 +15,11 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: openeye
+      POSTGRES_USER: openeye
+      POSTGRES_PASSWORD: openeye
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
   roboflow-inference:
@@ -29,6 +29,69 @@ services:
     environment:
       ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:-}
 
+  frame-capture:
+    build:
+      context: ../src
+      dockerfile: ../docker/Dockerfile.dotnet
+      args:
+        PROJECT: OpenEye.FrameCapture
+    depends_on:
+      - redis
+    environment:
+      ConnectionStrings__redis: redis:6379
+
+  detection-bridge:
+    build:
+      context: ../src
+      dockerfile: ../docker/Dockerfile.dotnet
+      args:
+        PROJECT: OpenEye.DetectionBridge
+    depends_on:
+      - redis
+      - roboflow-inference
+    environment:
+      ConnectionStrings__redis: redis:6379
+      Roboflow__Url: http://roboflow-inference:9001
+
+  pipeline-core:
+    build:
+      context: ../src
+      dockerfile: ../docker/Dockerfile.dotnet
+      args:
+        PROJECT: OpenEye.PipelineCore
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      ConnectionStrings__redis: redis:6379
+      ConnectionStrings__openeye: Host=postgres;Database=openeye;Username=openeye;Password=openeye
+
+  event-router:
+    build:
+      context: ../src
+      dockerfile: ../docker/Dockerfile.dotnet
+      args:
+        PROJECT: OpenEye.EventRouter
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      ConnectionStrings__redis: redis:6379
+      ConnectionStrings__openeye: Host=postgres;Database=openeye;Username=openeye;Password=openeye
+
+  dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: ../docker/Dockerfile.dashboard
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgresql://openeye:openeye@postgres:5432/openeye
+      REDIS_URL: redis://redis:6379
+
 volumes:
   redis-data:
-  postgres-data:
+  pgdata:

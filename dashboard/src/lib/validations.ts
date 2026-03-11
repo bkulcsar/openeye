@@ -39,3 +39,42 @@ export const createRuleSchema = z.object({
 });
 
 export const updateRuleSchema = createRuleSchema.partial();
+
+// --- Tripwire ---
+export const createTripwireSchema = z.object({
+  sourceId: z.string().min(1),
+  startX: z.number().min(0).max(1),
+  startY: z.number().min(0).max(1),
+  endX: z.number().min(0).max(1),
+  endY: z.number().min(0).max(1),
+});
+
+export const updateTripwireSchema = createTripwireSchema.partial();
+
+// --- Primitive Config ---
+export const createPrimitiveSchema = z.object({
+  name: z.string().min(1).max(255),
+  type: z.string().min(1).max(50),
+  classLabel: z.string().min(1).max(255),
+  zoneId: z.string().nullable().optional(),
+  tripwireId: z.string().nullable().optional(),
+  sourceId: z.string().min(1),
+});
+
+export const updatePrimitiveSchema = createPrimitiveSchema.partial().omit({ name: true });
+
+// --- Notification Config ---
+export const createNotificationSchema = z.object({
+  ruleId: z.string().min(1),
+  channels: z.array(z.object({
+    type: z.string().min(1).max(50),
+    config: z.record(z.string(), z.string()),
+  })).min(1),
+});
+
+export const updateNotificationSchema = z.object({
+  channels: z.array(z.object({
+    type: z.string().min(1).max(50),
+    config: z.record(z.string(), z.string()),
+  })).min(1),
+});

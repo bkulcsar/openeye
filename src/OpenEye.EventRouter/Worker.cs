@@ -53,6 +53,27 @@ public class Worker(
                         logger.LogError(ex, "Failed to dispatch notifications for event {EventId}", evt.EventId);
                     }
 
+                    // Check for evidence request in event metadata
+                    if (evt.Metadata?.TryGetValue("evidenceRequest", out var evidenceRequestObj) == true)
+                    {
+                        try
+                        {
+                            var evidenceJson = JsonSerializer.Serialize(evidenceRequestObj);
+                            var evidenceRequest = JsonSerializer.Deserialize<EvidenceRequest>(evidenceJson);
+                            if (evidenceRequest is not null)
+                            {
+                                logger.LogInformation(
+                                    "Evidence requested for event {EventId}: {Type} from {From} to {To}",
+                                    evt.EventId, evidenceRequest.Type, evidenceRequest.From, evidenceRequest.To);
+                                // TODO: Call IEvidenceProvider.CaptureEvidenceAsync when frame-capture supports shared volume
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Failed to process evidence request for event {EventId}", evt.EventId);
+                        }
+                    }
+
                     await consumer.AcknowledgeAsync(entry.Id);
                 }
             }
