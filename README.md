@@ -34,10 +34,10 @@ Camera Streams ─▶ Frame Capture ─▶ Detection Bridge ─▶ Pipeline Core
 
 ```bash
 cd docker
-docker compose up -d
+docker compose up -d redis postgres roboflow-inference
 ```
 
-This starts Redis, PostgreSQL (with schema from `init.sql`), and Roboflow Inference.
+This starts the infrastructure dependencies: Redis, PostgreSQL (with schema from `init.sql`), and Roboflow Inference.
 
 ### 2. Set up the dashboard
 
@@ -139,9 +139,22 @@ dashboard/
 └── prisma/schema.prisma      Database schema
 
 docker/
-├── docker-compose.yml        Infrastructure services
+├── docker-compose.yml        Full-stack services (infra + apps)
+├── Dockerfile.dotnet         Multi-stage .NET build (all C# services)
+├── Dockerfile.dashboard      Multi-stage Next.js build
 └── init.sql                  PostgreSQL bootstrap schema
 ```
+
+## Docker Deployment
+
+To run the full stack without Aspire:
+
+```bash
+cd docker
+docker compose up -d --build
+```
+
+This builds and starts all services (frame-capture, detection-bridge, pipeline-core, event-router, dashboard) alongside the infrastructure. Dashboard is available at **http://localhost:3000**.
 
 ## Testing
 
