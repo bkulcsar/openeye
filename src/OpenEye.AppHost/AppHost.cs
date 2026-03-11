@@ -26,6 +26,7 @@ builder.AddProject<Projects.OpenEye_EventRouter>("event-router")
 
 builder.AddNpmApp("dashboard", "../../dashboard", "dev")
     .WithReference(postgres)
+    .WithReference(redis)
     .WithHttpEndpoint(port: 3000, env: "PORT")
     .WithExternalHttpEndpoints()
     .WaitFor(postgres);
