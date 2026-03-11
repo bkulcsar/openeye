@@ -26,7 +26,6 @@ Camera Streams ─▶ Frame Capture ─▶ Detection Bridge ─▶ Pipeline Core
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org/)
 - [Docker](https://www.docker.com/) (for Redis, PostgreSQL, Roboflow Inference)
-- A [Roboflow](https://roboflow.com/) API key (optional — only for inference)
 
 ## Quick Start
 
@@ -72,21 +71,60 @@ Use the dashboard at http://localhost:3000/cameras to add camera sources, or edi
 }
 ```
 
+## Detection Models
+
+OpenEye uses [Roboflow Inference](https://github.com/roboflow/inference) as its model server. Inference is **fully open-source** and runs locally via Docker — no cloud dependency, no account required for built-in models.
+
+### Built-in models (no API key needed)
+
+Roboflow Inference ships with support for popular pretrained YOLO models that are downloaded automatically on first request:
+
+| Model ID | Architecture | Classes |
+|----------|-------------|--------|
+| `yolov8n-640` | YOLOv8 Nano | COCO 80 classes (person, car, etc.) |
+| `yolov8s-640` | YOLOv8 Small | COCO 80 classes |
+| `yolov8m-640` | YOLOv8 Medium | COCO 80 classes |
+| `yolov11n-640` | YOLOv11 Nano | COCO 80 classes |
+
+The default is `yolov8n-640`. Change the model by setting `Roboflow:ModelId` in the detection-bridge config.
+
+### Using a custom model
+
+If you've trained your own YOLO model (e.g., for forklifts, PPE, specific products), you have two options:
+
+**Option 1: Upload to Roboflow (requires API key)**
+1. Train your model anywhere (Ultralytics, custom pipeline, etc.)
+2. Upload weights to a [Roboflow](https://roboflow.com/) project
+3. Set `Roboflow:ModelId` to `your-project/version` (e.g., `forklift-detection/3`)
+4. Set `ROBOFLOW_API_KEY` so the inference server can pull the model
+
+**Option 2: Mount weights locally (no API key)**
+1. Export your model to ONNX or supported format
+2. Mount the weights directory into the inference container:
+   ```yaml
+   roboflow-inference:
+     volumes:
+       - ./my-models:/models
+   ```
+3. Reference the model via the inference API
+
+### What is the API key for?
+
+The `ROBOFLOW_API_KEY` is **only** needed to download private models from Roboflow's cloud model registry. If you use built-in models (like `yolov8n-640`) or mount custom weights locally, **no API key is required**.
+
 ## Configuration
 
 Services auto-configure connection strings when run via Aspire. For standalone mode, configure in each service's `appsettings.json`:
 
 | Setting | Service | Example |
-|---------|---------|---------|
+|---------|---------|---------||
 | `ConnectionStrings:redis` | All | `localhost:6379` |
 | `ConnectionStrings:openeye` | pipeline-core, event-router | `Host=localhost;Database=openeye;Username=postgres;Password=postgres` |
 | `Roboflow:Url` | detection-bridge | `http://localhost:9001` |
-| `Roboflow:ModelId` | detection-bridge | `yolov8n-640` |
-| `Roboflow:ApiKey` | detection-bridge | Your Roboflow API key |
+| `Roboflow:ModelId` | detection-bridge | `yolov8n-640` (see [Detection Models](#detection-models)) |
+| `Roboflow:ApiKey` | detection-bridge | Optional — only for Roboflow-hosted models |
 | `Cameras` | frame-capture | Array of camera configs |
 | `CameraIds` | detection-bridge, pipeline-core | `["cam-1"]` |
-
-Environment variables: set `ROBOFLOW_API_KEY` for Docker Compose inference.
 
 ## Redis Streams Topology
 
