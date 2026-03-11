@@ -39,3 +39,14 @@ export const createRuleSchema = z.object({
 });
 
 export const updateRuleSchema = createRuleSchema.partial();
+
+// --- Tripwire ---
+export const createTripwireSchema = z.object({
+  sourceId: z.string().min(1),
+  startX: z.number().min(0).max(1),
+  startY: z.number().min(0).max(1),
+  endX: z.number().min(0).max(1),
+  endY: z.number().min(0).max(1),
+});
+
+export const updateTripwireSchema = createTripwireSchema.partial();
