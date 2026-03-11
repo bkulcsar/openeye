@@ -50,3 +50,15 @@ export const createTripwireSchema = z.object({
 });
 
 export const updateTripwireSchema = createTripwireSchema.partial();
+
+// --- Primitive Config ---
+export const createPrimitiveSchema = z.object({
+  name: z.string().min(1).max(255),
+  type: z.string().min(1).max(50),
+  classLabel: z.string().min(1).max(255),
+  zoneId: z.string().nullable().optional(),
+  tripwireId: z.string().nullable().optional(),
+  sourceId: z.string().min(1),
+});
+
+export const updatePrimitiveSchema = createPrimitiveSchema.partial().omit({ name: true });
