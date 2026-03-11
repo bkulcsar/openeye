@@ -62,3 +62,19 @@ export const createPrimitiveSchema = z.object({
 });
 
 export const updatePrimitiveSchema = createPrimitiveSchema.partial().omit({ name: true });
+
+// --- Notification Config ---
+export const createNotificationSchema = z.object({
+  ruleId: z.string().min(1),
+  channels: z.array(z.object({
+    type: z.string().min(1).max(50),
+    config: z.record(z.string(), z.string()),
+  })).min(1),
+});
+
+export const updateNotificationSchema = z.object({
+  channels: z.array(z.object({
+    type: z.string().min(1).max(50),
+    config: z.record(z.string(), z.string()),
+  })).min(1),
+});
