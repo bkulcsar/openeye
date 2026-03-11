@@ -27,7 +27,9 @@ Camera Streams ─▶ Frame Capture ─▶ Detection Bridge ─▶ Pipeline Core
 - [Node.js 22+](https://nodejs.org/)
 - [Docker](https://www.docker.com/) (for Redis, PostgreSQL, Roboflow Inference)
 
-## Quick Start
+## Local Development
+
+For local development, services run natively with .NET Aspire orchestrating the backend and Next.js dev server for the dashboard. Only infrastructure (Redis, PostgreSQL, Roboflow Inference) runs in Docker.
 
 ### 1. Start infrastructure
 
@@ -183,9 +185,9 @@ docker/
 └── init.sql                  PostgreSQL bootstrap schema
 ```
 
-## Docker Deployment
+## Production Deployment
 
-To run the full stack without Aspire:
+To run the full stack in Docker (no local SDKs required):
 
 ```bash
 cd docker
