@@ -116,10 +116,16 @@ The `ROBOFLOW_API_KEY` is **only** needed to download private models from Robofl
 
 ## Configuration
 
-Services auto-configure connection strings when run via Aspire. For standalone mode, configure in each service's `appsettings.json`:
+### Via Aspire (local development)
+
+Connection strings are injected automatically — no manual configuration needed.
+
+### Via `appsettings.json` (local standalone)
+
+Each service reads its settings from `appsettings.json`:
 
 | Setting | Service | Example |
-|---------|---------|---------||
+|---------|---------|---------|
 | `ConnectionStrings:redis` | All | `localhost:6379` |
 | `ConnectionStrings:openeye` | pipeline-core, event-router | `Host=localhost;Database=openeye;Username=postgres;Password=postgres` |
 | `Roboflow:Url` | detection-bridge | `http://localhost:9001` |
@@ -127,6 +133,28 @@ Services auto-configure connection strings when run via Aspire. For standalone m
 | `Roboflow:ApiKey` | detection-bridge | Optional — only for Roboflow-hosted models |
 | `Cameras` | frame-capture | Array of camera configs |
 | `CameraIds` | detection-bridge, pipeline-core | `["cam-1"]` |
+
+### Via environment variables (Docker Compose)
+
+When running with Docker Compose, configure services through environment variables in `docker-compose.yml` — no rebuild required. .NET uses `__` (double underscore) as the nesting separator:
+
+| Environment Variable | `appsettings.json` Equivalent |
+|---------------------|-------------------------------|
+| `ConnectionStrings__redis` | `ConnectionStrings:redis` |
+| `ConnectionStrings__openeye` | `ConnectionStrings:openeye` |
+| `Roboflow__Url` | `Roboflow:Url` |
+| `Roboflow__ModelId` | `Roboflow:ModelId` |
+| `Roboflow__ApiKey` | `Roboflow:ApiKey` |
+
+Example override in `docker-compose.yml`:
+```yaml
+detection-bridge:
+  environment:
+    Roboflow__ModelId: my-custom-model/2
+    Roboflow__ApiKey: your-key-here
+```
+
+After changing environment variables, restart the affected service: `docker compose restart detection-bridge`
 
 ## Redis Streams Topology
 
