@@ -1,6 +1,11 @@
 "use client";
 
 import { ConditionConfig, CONDITION_TYPES } from "./types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 interface ConditionCardProps {
   condition: ConditionConfig;
@@ -14,36 +19,45 @@ export function ConditionCard({ condition, index, onUpdate, onRemove }: Conditio
   if (!typeDef) return null;
 
   return (
-    <div className="border rounded-lg p-4 bg-white shadow-sm" draggable>
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-medium text-sm">{typeDef.label}</h4>
-        <button
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle className="text-sm">{typeDef.label}</CardTitle>
+          <p className="text-xs text-muted-foreground">{typeDef.description}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Remove condition"
           onClick={() => onRemove(index)}
-          className="text-red-500 hover:text-red-700 text-sm"
+          className="text-destructive hover:text-destructive"
         >
-          Remove
-        </button>
-      </div>
-      <p className="text-xs text-gray-500 mb-3">{typeDef.description}</p>
-      <div className="space-y-2">
-        {Object.entries(typeDef.params).map(([key, paramDef]) => (
-          <div key={key} className="flex items-center gap-2">
-            <label className="text-xs text-gray-600 w-24">{paramDef.label}</label>
-            <input
-              type={paramDef.type}
-              value={(condition.params[key] as string | number) ?? paramDef.default}
-              onChange={(e) => {
-                const value = paramDef.type === "number" ? Number(e.target.value) : e.target.value;
-                onUpdate(index, {
-                  ...condition,
-                  params: { ...condition.params, [key]: value },
-                });
-              }}
-              className="border rounded px-2 py-1 text-sm flex-1"
-            />
-          </div>
-        ))}
-      </div>
-    </div>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      {Object.keys(typeDef.params).length > 0 && (
+        <CardContent className="space-y-3">
+          {Object.entries(typeDef.params).map(([key, paramDef]) => (
+            <div key={key} className="grid gap-1.5">
+              <Label htmlFor={`cond-${index}-${key}`} className="text-xs">{paramDef.label}</Label>
+              <Input
+                id={`cond-${index}-${key}`}
+                name={key}
+                type={paramDef.type}
+                value={(condition.params[key] as string | number) ?? paramDef.default}
+                onChange={(e) => {
+                  const value = paramDef.type === "number" ? Number(e.target.value) : e.target.value;
+                  onUpdate(index, {
+                    ...condition,
+                    params: { ...condition.params, [key]: value },
+                  });
+                }}
+                autoComplete="off"
+              />
+            </div>
+          ))}
+        </CardContent>
+      )}
+    </Card>
   );
 }

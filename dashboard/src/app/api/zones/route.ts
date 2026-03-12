@@ -3,6 +3,8 @@ import { publishConfigChanged } from "@/lib/redis";
 import { createZoneSchema } from "@/lib/validations";
 import { NextResponse } from "next/server";
 
+import { Prisma } from "@prisma/client";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const cameraId = searchParams.get("cameraId");
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
     data: {
       name: result.data.name,
       cameraId: result.data.cameraId,
-      polygon: result.data.polygon,
+      polygon: result.data.polygon as Prisma.InputJsonValue,
       type: result.data.type ?? "zone",
     },
   });

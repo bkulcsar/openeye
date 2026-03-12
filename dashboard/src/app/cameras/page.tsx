@@ -1,6 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CameraFormDialog } from "@/components/cameras/camera-form-dialog";
+import { MoreHorizontal, Pencil, Trash2, Power } from "lucide-react";
+import { toast } from "sonner";
 
 interface Camera {
   id: string;
@@ -14,37 +38,24 @@ interface Camera {
   zones: { id: string; name: string }[];
 }
 
-interface CameraForm {
-  name: string;
-  url: string;
-  targetFps: number;
-  enabled: boolean;
-}
-
-const emptyForm: CameraForm = { name: "", url: "", targetFps: 5, enabled: true };
-
 export default function CamerasPage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<CameraForm>(emptyForm);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Camera | null>(null);
 
   useEffect(() => {
     fetch("/api/cameras")
       .then((r) => r.json())
-      .then(setCameras);
+      .then(setCameras)
+      .catch(() => toast.error("Failed to load cameras"))
+      .finally(() => setLoading(false));
   }, []);
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setShowForm(false);
-    setEditingId(null);
-  };
-
-  const handleSave = async () => {
-    const method = editingId ? "PUT" : "POST";
-    const url = editingId ? `/api/cameras/${editingId}` : "/api/cameras";
+  const handleSave = async (form: { name: string; url: string; targetFps: number; enabled: boolean }) => {
+    const method = editingCamera ? "PUT" : "POST";
+    const url = editingCamera ? `/api/cameras/${editingCamera.id}` : "/api/cameras";
 
     const res = await fetch(url, {
       method,
@@ -52,32 +63,32 @@ export default function CamerasPage() {
       body: JSON.stringify(form),
     });
 
-    if (res.ok) {
-      const saved = await res.json();
-      if (editingId) {
-        setCameras(cameras.map((c) => (c.id === saved.id ? { ...c, ...saved } : c)));
-      } else {
-        setCameras([{ ...saved, zones: [] }, ...cameras]);
-      }
-      resetForm();
+    if (!res.ok) {
+      toast.error(editingCamera ? "Failed to update camera" : "Failed to create camera");
+      return;
     }
+
+    const saved = await res.json();
+    if (editingCamera) {
+      setCameras(cameras.map((c) => (c.id === saved.id ? { ...c, ...saved } : c)));
+      toast.success("Camera updated");
+    } else {
+      setCameras([{ ...saved, zones: [] }, ...cameras]);
+      toast.success("Camera created");
+    }
+    setEditingCamera(null);
   };
 
-  const handleEdit = (camera: Camera) => {
-    setForm({
-      name: camera.name,
-      url: camera.url,
-      targetFps: camera.targetFps,
-      enabled: camera.enabled,
-    });
-    setEditingId(camera.id);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    await fetch(`/api/cameras/${id}`, { method: "DELETE" });
-    setCameras(cameras.filter((c) => c.id !== id));
-    setDeleting(null);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const res = await fetch(`/api/cameras/${deleteTarget.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setCameras(cameras.filter((c) => c.id !== deleteTarget.id));
+      toast.success("Camera deleted");
+    } else {
+      toast.error("Failed to delete camera");
+    }
+    setDeleteTarget(null);
   };
 
   const handleToggle = async (camera: Camera) => {
@@ -89,155 +100,130 @@ export default function CamerasPage() {
     if (res.ok) {
       const updated = await res.json();
       setCameras(cameras.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+      toast.success(updated.enabled ? "Camera enabled" : "Camera disabled");
     }
   };
 
-  const truncateUrl = (url: string, max = 40) =>
+  const truncateUrl = (url: string, max = 45) =>
     url.length > max ? url.slice(0, max) + "…" : url;
 
-  return (
-    <div className="max-w-4xl mx-auto p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Cameras</h1>
-        <button
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Add Camera
-        </button>
-      </div>
+  const openCreate = () => {
+    setEditingCamera(null);
+    setDialogOpen(true);
+  };
 
-      {showForm && (
-        <div className="border rounded-lg p-4 bg-white shadow-sm mb-6">
-          <h2 className="font-medium mb-3">{editingId ? "Edit Camera" : "New Camera"}</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                placeholder="Front Door Camera"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Stream URL</label>
-              <input
-                type="text"
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                placeholder="rtsp://192.168.1.100:554/stream"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Target FPS</label>
-              <input
-                type="number"
-                value={form.targetFps}
-                onChange={(e) => setForm({ ...form, targetFps: Number(e.target.value) })}
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                min={1}
-                max={30}
-              />
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.enabled}
-                  onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-                  className="rounded"
-                />
-                Enabled
-              </label>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <button
-              onClick={handleSave}
-              disabled={!form.name || !form.url}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {editingId ? "Update" : "Create"}
-            </button>
-            <button
-              onClick={resetForm}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
+  const openEdit = (camera: Camera) => {
+    setEditingCamera(camera);
+    setDialogOpen(true);
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader
+        title="Cameras"
+        description="Manage camera streams for video analytics."
+        action={{ label: "Add Camera", onClick: openCreate }}
+      />
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-64" />
+                </div>
+                <Skeleton className="h-8 w-8" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : cameras.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">No cameras yet. Add one to get started.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {cameras.map((camera) => (
+            <Card key={camera.id}>
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium">{camera.name}</h3>
+                    <Badge variant={camera.enabled ? "default" : "secondary"}>
+                      {camera.enabled ? "Active" : "Disabled"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground truncate">
+                    {truncateUrl(camera.url)} · {camera.targetFps} FPS · {camera.zones?.length ?? 0} zone(s)
+                  </p>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm hover:bg-muted" aria-label="Camera actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEdit(camera)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleToggle(camera)}>
+                      <Power className="mr-2 h-4 w-4" />
+                      {camera.enabled ? "Disable" : "Enable"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => setDeleteTarget(camera)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
-      <div className="space-y-3">
-        {cameras.map((camera) => (
-          <div key={camera.id} className="border rounded-lg p-4 bg-white shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium">{camera.name}</h3>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      camera.enabled
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {camera.enabled ? "Active" : "Disabled"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  {truncateUrl(camera.url)} · {camera.targetFps} FPS · {camera.zones?.length ?? 0} zone(s)
-                </p>
-              </div>
-              <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => handleToggle(camera)}
-                  className="text-sm text-gray-600 hover:text-gray-800"
-                >
-                  {camera.enabled ? "Disable" : "Enable"}
-                </button>
-                <button
-                  onClick={() => handleEdit(camera)}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Edit
-                </button>
-                {deleting === camera.id ? (
-                  <>
-                    <span className="text-sm text-red-600">Confirm?</span>
-                    <button
-                      onClick={() => handleDelete(camera.id)}
-                      className="text-sm text-red-700 font-medium hover:text-red-900"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => setDeleting(null)}
-                      className="text-sm text-gray-600 hover:text-gray-800"
-                    >
-                      No
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setDeleting(camera.id)}
-                    className="text-sm text-red-600 hover:text-red-800"
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-        {cameras.length === 0 && (
-          <p className="text-gray-500 text-center py-8">No cameras yet. Add one to get started.</p>
-        )}
-      </div>
+      <CameraFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditingCamera(null);
+        }}
+        editingId={editingCamera?.id}
+        initialData={
+          editingCamera
+            ? {
+                name: editingCamera.name,
+                url: editingCamera.url,
+                targetFps: editingCamera.targetFps,
+                enabled: editingCamera.enabled,
+              }
+            : undefined
+        }
+        onSave={handleSave}
+      />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Camera</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete &quot;{deleteTarget?.name}&quot; and all its associated zones. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete Camera</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { publishConfigChanged } from "@/lib/redis";
 import { updateZoneSchema } from "@/lib/validations";
 import { NextResponse } from "next/server";
 
+import { Prisma } from "@prisma/client";
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const zone = await prisma.zone.findUnique({ where: { id } });
@@ -17,7 +19,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!result.success) {
     return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
   }
-  const zone = await prisma.zone.update({ where: { id }, data: result.data });
+  const zone = await prisma.zone.update({ where: { id }, data: result.data as Prisma.ZoneUncheckedUpdateInput });
   await publishConfigChanged("zones");
   return NextResponse.json(zone);
 }

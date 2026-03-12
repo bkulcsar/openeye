@@ -1,6 +1,7 @@
 "use client";
 
 import { CONDITION_TYPES, ConditionConfig } from "./types";
+import { Button } from "@/components/ui/button";
 
 interface ConditionPaletteProps {
   onAdd: (condition: ConditionConfig) => void;
@@ -9,10 +10,12 @@ interface ConditionPaletteProps {
 export function ConditionPalette({ onAdd }: ConditionPaletteProps) {
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700">Conditions</h3>
+      <h3 className="text-sm font-semibold">Conditions</h3>
       {CONDITION_TYPES.map((typeDef) => (
-        <button
+        <Button
           key={typeDef.type}
+          variant="outline"
+          className="w-full h-auto flex-col items-start gap-0.5 p-3"
           onClick={() => {
             const defaultParams: Record<string, unknown> = {};
             for (const [key, paramDef] of Object.entries(typeDef.params)) {
@@ -20,11 +23,10 @@ export function ConditionPalette({ onAdd }: ConditionPaletteProps) {
             }
             onAdd({ type: typeDef.type, params: defaultParams });
           }}
-          className="w-full text-left border rounded p-2 hover:bg-blue-50 transition-colors"
         >
-          <div className="text-sm font-medium">{typeDef.label}</div>
-          <div className="text-xs text-gray-500">{typeDef.description}</div>
-        </button>
+          <span className="text-sm font-medium">{typeDef.label}</span>
+          <span className="text-xs text-muted-foreground font-normal">{typeDef.description}</span>
+        </Button>
       ))}
     </div>
   );

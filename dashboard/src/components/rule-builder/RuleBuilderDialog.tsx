@@ -3,89 +3,114 @@
 import { useState } from "react";
 import { RuleFormData, ConditionConfig } from "./types";
 import { RuleCanvas } from "./RuleCanvas";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 interface RuleBuilderDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   cameraId: string;
   initialData?: Partial<RuleFormData>;
-  onSave: (data: RuleFormData) => void;
-  onCancel: () => void;
+  onSave: (data: RuleFormData) => Promise<void>;
 }
 
-export function RuleBuilderDialog({ cameraId, initialData, onSave, onCancel }: RuleBuilderDialogProps) {
+export function RuleBuilderDialog({ open, onOpenChange, cameraId, initialData, onSave }: RuleBuilderDialogProps) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [objectClass, setObjectClass] = useState(initialData?.objectClass ?? "person");
   const [zoneId, setZoneId] = useState(initialData?.zoneId ?? "");
   const [conditions, setConditions] = useState<ConditionConfig[]>(initialData?.conditions ?? []);
   const [logic, setLogic] = useState<"all" | "any">(initialData?.logic ?? "all");
   const [cooldown, setCooldown] = useState(initialData?.cooldown ?? 30);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave({
-      name,
-      cameraId,
-      objectClass,
-      zoneId: zoneId || undefined,
-      conditions,
-      logic,
-      cooldown,
-      enabled: true,
-    });
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave({
+        name,
+        cameraId,
+        objectClass,
+        zoneId: zoneId || undefined,
+        conditions,
+        logic,
+        cooldown,
+        enabled: true,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-        <h2 className="text-xl font-bold mb-4">
-          {initialData ? "Edit Rule" : "Create Rule"}
-        </h2>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initialData ? "Edit Rule" : "Create Rule"}</DialogTitle>
+          <DialogDescription>
+            Configure conditions that trigger events when matched.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Basic fields */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rule Name</label>
-            <input
-              type="text"
+        <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="rule-name">Rule Name</Label>
+            <Input
+              id="rule-name"
+              name="ruleName"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              placeholder="e.g., Loitering Alert"
+              placeholder="Loitering Alert…"
+              autoComplete="off"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Object Class</label>
-            <input
-              type="text"
+          <div className="grid gap-2">
+            <Label htmlFor="rule-class">Object Class</Label>
+            <Input
+              id="rule-class"
+              name="objectClass"
               value={objectClass}
               onChange={(e) => setObjectClass(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              placeholder="e.g., person"
+              placeholder="person…"
+              autoComplete="off"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Zone ID (optional)</label>
-            <input
-              type="text"
+          <div className="grid gap-2">
+            <Label htmlFor="rule-zone">Zone ID (optional)</Label>
+            <Input
+              id="rule-zone"
+              name="zoneId"
               value={zoneId}
               onChange={(e) => setZoneId(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              placeholder="Zone ID"
+              placeholder="Zone ID…"
+              autoComplete="off"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cooldown (seconds)</label>
-            <input
+          <div className="grid gap-2">
+            <Label htmlFor="rule-cooldown">Cooldown (seconds)</Label>
+            <Input
+              id="rule-cooldown"
+              name="cooldown"
               type="number"
               value={cooldown}
               onChange={(e) => setCooldown(Number(e.target.value))}
-              className="w-full border rounded px-3 py-2"
               min={0}
+              autoComplete="off"
             />
           </div>
         </div>
 
-        {/* Rule Builder Canvas */}
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Conditions</h3>
+        <div>
+          <h3 className="text-sm font-semibold mb-3">Conditions</h3>
           <RuleCanvas
             conditions={conditions}
             logic={logic}
@@ -94,23 +119,17 @@ export function RuleBuilderDialog({ cameraId, initialData, onSave, onCancel }: R
           />
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
             onClick={handleSave}
-            disabled={!name || conditions.length === 0}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            disabled={!name || conditions.length === 0 || saving}
           >
-            Save Rule
-          </button>
-        </div>
-      </div>
-    </div>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {initialData ? "Save Rule" : "Create Rule"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

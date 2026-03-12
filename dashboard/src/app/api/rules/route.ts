@@ -3,6 +3,8 @@ import { publishConfigChanged } from "@/lib/redis";
 import { createRuleSchema } from "@/lib/validations";
 import { NextResponse } from "next/server";
 
+import { Prisma } from "@prisma/client";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const cameraId = searchParams.get("cameraId");
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
       objectClass: result.data.objectClass,
       zoneId: result.data.zoneId ?? null,
       enabled: result.data.enabled ?? true,
-      conditions: result.data.conditions,
+      conditions: result.data.conditions as Prisma.InputJsonValue,
       logic: result.data.logic ?? "all",
       cooldown: result.data.cooldown ?? 30,
     },
