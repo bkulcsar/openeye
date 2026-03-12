@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS tripwires (
     start_y      DOUBLE PRECISION NOT NULL,
     end_x        DOUBLE PRECISION NOT NULL,
     end_y        DOUBLE PRECISION NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ── Rules ────────────────────────────────────────────────────────────────────
@@ -66,14 +67,16 @@ CREATE TABLE IF NOT EXISTS primitive_configs (
     zone_id      TEXT,
     tripwire_id  TEXT,
     source_id    TEXT NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ── Notification Configs ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notification_configs (
     rule_id      TEXT PRIMARY KEY,
     channels     JSONB NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ── Events ───────────────────────────────────────────────────────────────────

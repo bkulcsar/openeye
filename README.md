@@ -29,30 +29,23 @@ Camera Streams ─▶ Frame Capture ─▶ Detection Bridge ─▶ Pipeline Core
 
 ## Local Development
 
-For local development, .NET Aspire orchestrates backend services, Redis, PostgreSQL, and the dashboard. Roboflow Inference runs via Docker Compose.
+For local development, .NET Aspire orchestrates **everything** — backend services, Redis, PostgreSQL, Roboflow Inference, and the Next.js dashboard. No Docker Compose needed.
 
-### 1. Start Roboflow Inference
-
-```bash
-cd docker
-docker compose up -d roboflow-inference
-```
-
-### 2. Install dashboard dependencies
+### 1. Install dashboard dependencies
 
 ```bash
 cd dashboard
 npm install
 ```
 
-### 3. Run everything via Aspire
+### 2. Run everything via Aspire
 
 ```bash
 cd src
 dotnet run --project OpenEye.AppHost
 ```
 
-Aspire automatically starts Redis, PostgreSQL (with schema from `docker/init.sql`), and all backend services. The Aspire dashboard opens automatically with health monitoring.
+Aspire automatically starts Redis, PostgreSQL (with schema from `docker/init.sql`), Roboflow Inference, and all backend services. The Aspire dashboard opens automatically with health monitoring.
 
 Dashboard is available at **http://localhost:3000**.
 
@@ -160,6 +153,19 @@ events                  pipeline-core → event-router
 config:changed          dashboard → pipeline-core, detection-bridge (pub/sub)
 ```
 
+## Database Schema
+
+The project uses a **database-first** approach. `docker/init.sql` is the single source of truth for the schema — it runs automatically when PostgreSQL starts (via Aspire or Docker Compose).
+
+The Next.js dashboard uses Prisma only as a **typed query client**, not as a schema manager. When you change the database schema:
+
+1. Edit `docker/init.sql`
+2. Recreate the database (or run `ALTER TABLE` manually)
+3. Run `npx prisma db pull` in `dashboard/` to sync `schema.prisma` from the live DB
+4. Run `npx prisma generate` to regenerate the TypeScript client
+
+> **Do not** use `prisma db push` or `prisma migrate` — the .NET backend services query these tables directly, and `init.sql` must remain the authority.
+
 ## Data Model
 
 | Table | Purpose |
@@ -202,7 +208,7 @@ dashboard/
 └── prisma/schema.prisma      Database schema
 
 docker/
-├── docker-compose.yml        Full-stack services (infra + apps)
+├── docker-compose.yml        Production deployment (infra + apps)
 ├── Dockerfile.dotnet         Multi-stage .NET build (all C# services)
 ├── Dockerfile.dashboard      Multi-stage Next.js build
 └── init.sql                  PostgreSQL bootstrap schema
