@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { updateNotificationSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export async function GET(_: Request, { params }: { params: Promise<{ ruleId: string }> }) {
   const { ruleId } = await params;
@@ -18,13 +18,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ rule
     return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
   }
   const config = await prisma.notificationConfig.update({ where: { ruleId }, data: result.data });
-  await publishConfigChanged("notifications");
+  after(() => publishConfigChanged("notifications"));
   return NextResponse.json(config);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ ruleId: string }> }) {
   const { ruleId } = await params;
   await prisma.notificationConfig.delete({ where: { ruleId } });
-  await publishConfigChanged("notifications");
+  after(() => publishConfigChanged("notifications"));
   return NextResponse.json({ deleted: true });
 }

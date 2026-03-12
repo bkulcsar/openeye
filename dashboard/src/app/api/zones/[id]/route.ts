@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { updateZoneSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { Prisma } from "@prisma/client";
 
@@ -20,13 +20,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
   }
   const zone = await prisma.zone.update({ where: { id }, data: result.data as Prisma.ZoneUncheckedUpdateInput });
-  await publishConfigChanged("zones");
+  after(() => publishConfigChanged("zones"));
   return NextResponse.json(zone);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await prisma.zone.delete({ where: { id } });
-  await publishConfigChanged("zones");
+  after(() => publishConfigChanged("zones"));
   return NextResponse.json({ deleted: true });
 }

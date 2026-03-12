@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { createZoneSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { Prisma } from "@prisma/client";
 
@@ -29,6 +29,6 @@ export async function POST(request: Request) {
       type: result.data.type ?? "zone",
     },
   });
-  await publishConfigChanged("zones");
+  after(() => publishConfigChanged("zones"));
   return NextResponse.json(zone, { status: 201 });
 }

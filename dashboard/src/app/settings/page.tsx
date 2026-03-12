@@ -1,20 +1,13 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+
+export const dynamic = "force-dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, MapPin, Scale, Activity } from "lucide-react";
-import { toast } from "sonner";
-
-interface SystemHealth {
-  cameras: number;
-  rules: number;
-  zones: number;
-  events: number;
-}
+import { getDashboardCounts } from "@/lib/data";
 
 const stats = [
   { key: "cameras" as const, label: "Cameras", icon: Camera },
@@ -23,29 +16,51 @@ const stats = [
   { key: "events" as const, label: "Total Events", icon: Activity },
 ];
 
+function OverviewLoading() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="flex items-center gap-4 py-5">
+            <Skeleton className="h-10 w-10 rounded-md" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-6 w-12" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+async function SystemOverview() {
+  const [cameraCount, ruleCount, zoneCount, eventCount] = await getDashboardCounts();
+  const counts = { cameras: cameraCount, zones: zoneCount, rules: ruleCount, events: eventCount };
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {stats.map((s) => {
+        const Icon = s.icon;
+        return (
+          <Card key={s.key}>
+            <CardContent className="flex items-center gap-4 py-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold tabular-nums">{counts[s.key]}</p>
+                <p className="text-sm text-muted-foreground">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/cameras").then((r) => r.json()),
-      fetch("/api/rules").then((r) => r.json()),
-      fetch("/api/zones").then((r) => r.json()),
-      fetch("/api/events?limit=1").then((r) => r.json()),
-    ])
-      .then(([cameras, rules, zones, eventsData]) => {
-        setHealth({
-          cameras: cameras.length,
-          rules: rules.length,
-          zones: zones.length,
-          events: eventsData.total ?? 0,
-        });
-      })
-      .catch(() => toast.error("Failed to load system stats"))
-      .finally(() => setLoading(false));
-  }, []);
-
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <PageHeader title="Settings" description="System overview and configuration reference." />
@@ -53,36 +68,9 @@ export default function SettingsPage() {
       {/* System Overview */}
       <section>
         <h2 className="mb-3 text-lg font-semibold">System Overview</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {loading
-            ? Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="flex items-center gap-4 py-5">
-                    <Skeleton className="h-10 w-10 rounded-md" />
-                    <div className="space-y-1.5">
-                      <Skeleton className="h-6 w-12" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            : stats.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <Card key={s.key}>
-                    <CardContent className="flex items-center gap-4 py-5">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold tabular-nums">{health?.[s.key] ?? 0}</p>
-                        <p className="text-sm text-muted-foreground">{s.label}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-        </div>
+        <Suspense fallback={<OverviewLoading />}>
+          <SystemOverview />
+        </Suspense>
       </section>
 
       <Separator />

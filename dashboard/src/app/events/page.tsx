@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ export default function EventsPage() {
   const [sourceFilter, setSourceFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setLoading(true);
@@ -84,8 +85,11 @@ export default function EventsPage() {
             placeholder="Filter by source…"
             value={sourceFilter}
             onChange={(e) => {
-              setSourceFilter(e.target.value);
-              setOffset(0);
+              const value = e.target.value;
+              startTransition(() => {
+                setSourceFilter(value);
+                setOffset(0);
+              });
             }}
             autoComplete="off"
           />

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { updateTripwireSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,13 +18,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
   }
   const tripwire = await prisma.tripwire.update({ where: { id }, data: result.data });
-  await publishConfigChanged("tripwires");
+  after(() => publishConfigChanged("tripwires"));
   return NextResponse.json(tripwire);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await prisma.tripwire.delete({ where: { id } });
-  await publishConfigChanged("tripwires");
+  after(() => publishConfigChanged("tripwires"));
   return NextResponse.json({ deleted: true });
 }

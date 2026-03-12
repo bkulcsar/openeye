@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { updateRuleSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { Prisma } from "@prisma/client";
 
@@ -20,13 +20,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
   }
   const rule = await prisma.rule.update({ where: { id }, data: result.data as Prisma.RuleUncheckedUpdateInput });
-  await publishConfigChanged("rules");
+  after(() => publishConfigChanged("rules"));
   return NextResponse.json(rule);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await prisma.rule.delete({ where: { id } });
-  await publishConfigChanged("rules");
+  after(() => publishConfigChanged("rules"));
   return NextResponse.json({ deleted: true });
 }

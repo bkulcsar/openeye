@@ -5,8 +5,11 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import dynamic from "next/dynamic";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/sonner";
+const Toaster = dynamic(
+  () => import("@/components/ui/sonner").then((m) => m.Toaster)
+);
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { createTripwireSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -20,6 +20,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
   }
   const tripwire = await prisma.tripwire.create({ data: result.data });
-  await publishConfigChanged("tripwires");
+  after(() => publishConfigChanged("tripwires"));
   return NextResponse.json(tripwire, { status: 201 });
 }

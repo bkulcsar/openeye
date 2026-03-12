@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { updateCameraSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,13 +24,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     where: { id },
     data: result.data,
   });
-  await publishConfigChanged("cameras");
+  after(() => publishConfigChanged("cameras"));
   return NextResponse.json(camera);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await prisma.camera.delete({ where: { id } });
-  await publishConfigChanged("cameras");
+  after(() => publishConfigChanged("cameras"));
   return NextResponse.json({ deleted: true });
 }

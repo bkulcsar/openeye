@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publishConfigChanged } from "@/lib/redis";
 import { createCameraSchema } from "@/lib/validations";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export async function GET() {
   const cameras = await prisma.camera.findMany({
@@ -25,6 +25,6 @@ export async function POST(request: Request) {
       enabled: result.data.enabled ?? true,
     },
   });
-  await publishConfigChanged("cameras");
+  after(() => publishConfigChanged("cameras"));
   return NextResponse.json(camera, { status: 201 });
 }
