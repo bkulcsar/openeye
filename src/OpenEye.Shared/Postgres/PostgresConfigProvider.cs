@@ -67,7 +67,7 @@ public class PostgresConfigProvider(NpgsqlDataSource dataSource) : IConfigProvid
     {
         await using var conn = await dataSource.OpenConnectionAsync(ct);
         var rows = await conn.QueryAsync<dynamic>(
-            "SELECT rule_id, name, object_class, zone_id, conditions, logic, cooldown_seconds, tripwire_id, sustained_seconds, within_seconds, min_occurrences, evidence_type FROM rules");
+            "SELECT rule_id, name, camera_id, object_class, zone_id, conditions, logic, cooldown_seconds, tripwire_id, sustained_seconds, within_seconds, min_occurrences, evidence_type FROM rules");
         return rows.Select(r => new RuleDefinition(
             (string)r.rule_id,
             (string)r.name,
@@ -80,7 +80,8 @@ public class PostgresConfigProvider(NpgsqlDataSource dataSource) : IConfigProvid
             Sustained: r.sustained_seconds is double ss ? TimeSpan.FromSeconds(ss) : null,
             Within: r.within_seconds is double ws ? TimeSpan.FromSeconds(ws) : null,
             MinOccurrences: (int?)r.min_occurrences,
-            EvidenceType: r.evidence_type is string et ? Enum.Parse<EvidenceType>(et) : null
+            EvidenceType: r.evidence_type is string et ? Enum.Parse<EvidenceType>(et) : null,
+            CameraId: (string?)r.camera_id
         )).ToList();
     }
 
