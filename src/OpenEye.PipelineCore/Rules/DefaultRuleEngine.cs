@@ -63,10 +63,12 @@ public class DefaultRuleEngine(IConditionRegistry conditionRegistry, IRuleStateS
 
                 if (rule.EvidenceType is not null)
                 {
-                    metadata["evidenceRequestId"] = Guid.NewGuid().ToString();
-                    metadata["evidenceFrom"] = context.Timestamp.AddSeconds(-10);
-                    metadata["evidenceTo"] = context.Timestamp.AddSeconds(5);
-                    metadata["evidenceType"] = rule.EvidenceType.Value.ToString();
+                    metadata["evidenceRequest"] = new EvidenceRequest(
+                        EventId: eventId,
+                        SourceId: context.SourceId,
+                        From: context.Timestamp.AddSeconds(-10),
+                        To: context.Timestamp.AddSeconds(5),
+                        Type: rule.EvidenceType.Value);
                 }
 
                 events.Add(new Event(
