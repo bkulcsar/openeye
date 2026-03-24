@@ -1,30 +1,112 @@
+using System.Collections.Concurrent;
 using OpenCvSharp;
+using OpenEye.Shared;
 using OpenEye.Shared.Redis;
+using OpenEye.Shared.Models;
 using StackExchange.Redis;
 
 namespace OpenEye.FrameCapture;
 
 public class Worker(
     ILogger<Worker> logger,
-    IConfiguration config,
-    IConnectionMultiplexer redis) : BackgroundService
+    IConnectionMultiplexer redis,
+    IConfigProvider configProvider,
+    RedisConfigNotifier configNotifier) : BackgroundService
 {
     private const int InitialBackoffMs = 5_000;
     private const int MaxBackoffMs = 60_000;
     private const int JpegQuality = 80;
+    private readonly ConcurrentDictionary<string, CameraLoop> _loops = new();
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
+
+    private sealed record CameraEntry(string Id, string Url, int TargetFps);
+    private sealed record CameraLoop(CameraEntry Camera, CancellationTokenSource Cts, Task Task);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var cameras = config.GetSection("Cameras").Get<CameraEntry[]>() ?? [];
-        if (cameras.Length == 0)
-        {
-            logger.LogWarning("No cameras configured. Waiting...");
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-            return;
-        }
+        await SyncCameraLoopsAsync(stoppingToken);
 
-        var tasks = cameras.Select(c => CaptureLoop(c, stoppingToken));
-        await Task.WhenAll(tasks);
+        try
+        {
+            await foreach (var section in configNotifier.SubscribeAsync(stoppingToken))
+            {
+                if (section == "cameras")
+                {
+                    logger.LogInformation("Camera config changed; syncing frame-capture loops");
+                    await SyncCameraLoopsAsync(stoppingToken);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await StopAllLoopsAsync();
+        await base.StopAsync(cancellationToken);
+    }
+
+    private async Task SyncCameraLoopsAsync(CancellationToken ct)
+    {
+        await _syncLock.WaitAsync(ct);
+        try
+        {
+            var desired = (await configProvider.GetCamerasAsync(ct))
+                .Where(c => c.Enabled)
+                .Select(MapCamera)
+                .ToDictionary(c => c.Id, StringComparer.Ordinal);
+
+            // Stop removed/disabled cameras.
+            foreach (var existing in _loops.Keys.ToList())
+            {
+                if (!desired.ContainsKey(existing))
+                    await StopLoopAsync(existing);
+            }
+
+            // Start new cameras or restart changed ones.
+            foreach (var (cameraId, desiredCamera) in desired)
+            {
+                if (_loops.TryGetValue(cameraId, out var running))
+                {
+                    if (running.Camera == desiredCamera) continue;
+                    await StopLoopAsync(cameraId);
+                }
+
+                var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var task = Task.Run(() => CaptureLoop(desiredCamera, cts.Token), cts.Token);
+                _loops[cameraId] = new CameraLoop(desiredCamera, cts, task);
+                logger.LogInformation("Started frame capture loop for {CameraId}", cameraId);
+            }
+        }
+        finally
+        {
+            _syncLock.Release();
+        }
+    }
+
+    private async Task StopAllLoopsAsync()
+    {
+        var ids = _loops.Keys.ToList();
+        foreach (var id in ids)
+            await StopLoopAsync(id);
+    }
+
+    private async Task StopLoopAsync(string cameraId)
+    {
+        if (!_loops.TryRemove(cameraId, out var loop))
+            return;
+
+        try
+        {
+            loop.Cts.Cancel();
+            await loop.Task;
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            loop.Cts.Dispose();
+            logger.LogInformation("Stopped frame capture loop for {CameraId}", cameraId);
+        }
     }
 
     private async Task CaptureLoop(CameraEntry camera, CancellationToken ct)
@@ -109,11 +191,7 @@ public class Worker(
 
         return capture.IsOpened();
     }
-}
 
-public record CameraEntry
-{
-    public required string Id { get; init; }
-    public required string Url { get; init; }
-    public int TargetFps { get; init; } = 5;
+    private static CameraEntry MapCamera(CameraConfig camera)
+        => new(camera.Id, camera.StreamUrl, camera.TargetFps);
 }

@@ -36,7 +36,7 @@ public class PipelineOrchestratorTests
         var zone = new Zone("z1", "cam-1",
             [new Point2D(0.2, 0.2), new Point2D(0.8, 0.2), new Point2D(0.8, 0.8), new Point2D(0.2, 0.8)]);
         var rule = new RuleDefinition("rule-1", "zone_entry", "person", "z1", null,
-            [new ConditionConfig("presence")], "emit_event");
+            [new ConditionConfig("presence")], "emit_event", CameraId: "cam-1");
 
         orch.ReloadConfig([zone], [], [], [rule]);
 
@@ -64,10 +64,28 @@ public class PipelineOrchestratorTests
         var orch = MakeOrchestrator();
         orch.ReloadConfig([], [],
             [new PrimitiveConfig("p1", PrimitiveType.Presence, "person", null, null, "cam-1")],
-            [new RuleDefinition("r1", "test", "forklift", null, null, [], "emit_event")]);
+            [new RuleDefinition("r1", "test", "forklift", null, null, [], "emit_event", CameraId: "cam-1")]);
 
         var classes = orch.GetRequiredClasses();
         Assert.Contains("person", classes);
         Assert.Contains("forklift", classes);
+    }
+
+    [Fact]
+    public void FullPipeline_RuleScopedToDifferentCamera_DoesNotFire()
+    {
+        var orch = MakeOrchestrator();
+        var zone = new Zone("z1", "cam-1",
+            [new Point2D(0.2, 0.2), new Point2D(0.8, 0.2), new Point2D(0.8, 0.8), new Point2D(0.2, 0.8)]);
+        var rule = new RuleDefinition("rule-1", "zone_entry", "person", "z1", null,
+            [new ConditionConfig("presence")], "emit_event", CameraId: "cam-2");
+
+        orch.ReloadConfig([zone], [], [], [rule]);
+
+        var t = DateTimeOffset.UtcNow;
+        var det = new Detection("person", new BoundingBox(0.45, 0.45, 0.1, 0.1), 0.9, t, "cam-1");
+
+        var events = orch.ProcessFrame("cam-1", [det], t);
+        Assert.Empty(events);
     }
 }

@@ -1,6 +1,9 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using OpenEye.Shared;
+using OpenEye.Shared.Models;
 using OpenEye.Shared.Redis;
 using StackExchange.Redis;
 
@@ -10,38 +13,100 @@ public class Worker(
     ILogger<Worker> logger,
     IConfiguration config,
     IConnectionMultiplexer redis,
+    IConfigProvider configProvider,
+    RedisConfigNotifier configNotifier,
     IHttpClientFactory httpClientFactory) : BackgroundService
 {
     private volatile IReadOnlySet<string> _classFilter = new HashSet<string>();
+    private readonly ConcurrentDictionary<string, CameraLoop> _loops = new();
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
+    private sealed record CameraLoop(CancellationTokenSource Cts, Task Task);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var cameraIds = config.GetSection("CameraIds").Get<string[]>() ?? [];
-        if (cameraIds.Length == 0)
-        {
-            logger.LogWarning("No camera IDs configured. Waiting...");
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-            return;
-        }
-
-        var notifier = new RedisConfigNotifier(redis);
-        _classFilter = await notifier.GetClassFilterAsync(stoppingToken);
+        _classFilter = await configNotifier.GetClassFilterAsync(stoppingToken);
         logger.LogInformation("Loaded class filter: {Classes}", string.Join(", ", _classFilter));
 
-        var configTask = WatchConfigChanges(notifier, stoppingToken);
-        var consumeTasks = cameraIds.Select(id => ConsumeLoop(id, stoppingToken));
-        await Task.WhenAll(consumeTasks.Append(configTask));
+        await SyncCameraLoopsAsync(stoppingToken);
+
+        try
+        {
+            await foreach (var section in configNotifier.SubscribeAsync(stoppingToken))
+            {
+                if (section == "class-filter")
+                {
+                    _classFilter = await configNotifier.GetClassFilterAsync(stoppingToken);
+                    logger.LogInformation("Reloaded class filter: {Classes}", string.Join(", ", _classFilter));
+                }
+                else if (section == "cameras")
+                {
+                    logger.LogInformation("Camera config changed; syncing detection-bridge loops");
+                    await SyncCameraLoopsAsync(stoppingToken);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
 
-    private async Task WatchConfigChanges(RedisConfigNotifier notifier, CancellationToken ct)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        await foreach (var section in notifier.SubscribeAsync(ct))
+        await StopAllLoopsAsync();
+        await base.StopAsync(cancellationToken);
+    }
+
+    private async Task SyncCameraLoopsAsync(CancellationToken ct)
+    {
+        await _syncLock.WaitAsync(ct);
+        try
         {
-            if (section == "class-filter")
+            var desired = (await configProvider.GetCamerasAsync(ct))
+                .Where(c => c.Enabled)
+                .Select(c => c.Id)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var existing in _loops.Keys.ToList())
             {
-                _classFilter = await notifier.GetClassFilterAsync(ct);
-                logger.LogInformation("Reloaded class filter: {Classes}", string.Join(", ", _classFilter));
+                if (!desired.Contains(existing))
+                    await StopLoopAsync(existing);
             }
+
+            foreach (var cameraId in desired)
+            {
+                if (_loops.ContainsKey(cameraId))
+                    continue;
+                var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var task = Task.Run(() => ConsumeLoop(cameraId, cts.Token), cts.Token);
+                _loops[cameraId] = new CameraLoop(cts, task);
+                logger.LogInformation("Started detection-bridge loop for {CameraId}", cameraId);
+            }
+        }
+        finally
+        {
+            _syncLock.Release();
+        }
+    }
+
+    private async Task StopAllLoopsAsync()
+    {
+        var ids = _loops.Keys.ToList();
+        foreach (var id in ids)
+            await StopLoopAsync(id);
+    }
+
+    private async Task StopLoopAsync(string cameraId)
+    {
+        if (!_loops.TryRemove(cameraId, out var loop))
+            return;
+        try
+        {
+            loop.Cts.Cancel();
+            await loop.Task;
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            loop.Cts.Dispose();
+            logger.LogInformation("Stopped detection-bridge loop for {CameraId}", cameraId);
         }
     }
 

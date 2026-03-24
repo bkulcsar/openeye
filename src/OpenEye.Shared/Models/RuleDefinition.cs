@@ -13,4 +13,5 @@ public record RuleDefinition(
     TimeSpan? Sustained = null,
     TimeSpan? Within = null,
     int? MinOccurrences = null,
-    EvidenceType? EvidenceType = null);
+    EvidenceType? EvidenceType = null,
+    string? CameraId = null);

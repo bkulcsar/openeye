@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using OpenEye.PipelineCore.Pipeline;
 using OpenEye.Shared;
@@ -9,33 +10,27 @@ namespace OpenEye.PipelineCore;
 
 public class Worker(
     ILogger<Worker> logger,
-    IConfiguration config,
     IConnectionMultiplexer redis,
     IConfigProvider configProvider,
     RedisConfigNotifier configNotifier,
     PipelineOrchestrator orchestrator) : BackgroundService
 {
+    private readonly ConcurrentDictionary<string, CameraLoop> _loops = new();
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
+    private sealed record CameraLoop(CancellationTokenSource Cts, Task Task);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var cameraIds = config.GetSection("CameraIds").Get<string[]>() ?? [];
-        if (cameraIds.Length == 0)
-        {
-            logger.LogWarning("No camera IDs configured. Waiting...");
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-            return;
-        }
-
         // Load initial config from database
         await ReloadPipelineConfigAsync(stoppingToken);
 
         // Publish required class filter to Redis
         await PublishClassFilterAsync();
 
-        // Start config reload listener in background
-        _ = ListenForConfigChangesAsync(stoppingToken);
+        // Start per-camera loops from DB camera configuration.
+        await SyncCameraLoopsAsync(stoppingToken);
 
-        var tasks = cameraIds.Select(id => ConsumeLoop(id, stoppingToken));
-        await Task.WhenAll(tasks);
+        await ListenForConfigChangesAsync(stoppingToken);
     }
 
     private async Task ReloadPipelineConfigAsync(CancellationToken ct)
@@ -63,6 +58,9 @@ public class Worker(
                 logger.LogInformation("Config change received ({Section}), reloading pipeline config", section);
                 try
                 {
+                    if (section == "cameras")
+                        await SyncCameraLoopsAsync(ct);
+
                     await ReloadPipelineConfigAsync(ct);
                     await PublishClassFilterAsync();
                     logger.LogInformation("Pipeline config reloaded successfully");
@@ -74,6 +72,69 @@ public class Worker(
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await StopAllLoopsAsync();
+        await base.StopAsync(cancellationToken);
+    }
+
+    private async Task SyncCameraLoopsAsync(CancellationToken ct)
+    {
+        await _syncLock.WaitAsync(ct);
+        try
+        {
+            var desired = (await configProvider.GetCamerasAsync(ct))
+                .Where(c => c.Enabled)
+                .Select(c => c.Id)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var existing in _loops.Keys.ToList())
+            {
+                if (!desired.Contains(existing))
+                    await StopLoopAsync(existing);
+            }
+
+            foreach (var cameraId in desired)
+            {
+                if (_loops.ContainsKey(cameraId))
+                    continue;
+
+                var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var task = Task.Run(() => ConsumeLoop(cameraId, cts.Token), cts.Token);
+                _loops[cameraId] = new CameraLoop(cts, task);
+                logger.LogInformation("Started pipeline loop for {CameraId}", cameraId);
+            }
+        }
+        finally
+        {
+            _syncLock.Release();
+        }
+    }
+
+    private async Task StopAllLoopsAsync()
+    {
+        var ids = _loops.Keys.ToList();
+        foreach (var id in ids)
+            await StopLoopAsync(id);
+    }
+
+    private async Task StopLoopAsync(string cameraId)
+    {
+        if (!_loops.TryRemove(cameraId, out var loop))
+            return;
+        try
+        {
+            loop.Cts.Cancel();
+            await loop.Task;
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            loop.Cts.Dispose();
+            logger.LogInformation("Stopped pipeline loop for {CameraId}", cameraId);
+        }
     }
 
     private async Task ConsumeLoop(string cameraId, CancellationToken ct)

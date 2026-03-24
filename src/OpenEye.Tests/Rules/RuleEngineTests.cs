@@ -115,7 +115,7 @@ public class RuleEngineTests
     }
 
     [Fact]
-    public void RuleWithEvidenceType_IncludesEvidenceRequestIdInMetadata()
+    public void RuleWithEvidenceType_IncludesEvidenceRequestInMetadata()
     {
         var engine = MakeEngine();
         var t = DateTimeOffset.UtcNow;
@@ -141,12 +141,15 @@ public class RuleEngineTests
 
         var events = engine.Evaluate(ctx, rules);
         Assert.Single(events);
-        Assert.True(events[0].Metadata!.ContainsKey("evidenceRequestId"));
-        Assert.Equal("Screenshot", events[0].Metadata!["evidenceType"]);
+        Assert.True(events[0].Metadata!.ContainsKey("evidenceRequest"));
+        var evidenceRequest = Assert.IsType<EvidenceRequest>(events[0].Metadata!["evidenceRequest"]);
+        Assert.Equal(events[0].EventId, evidenceRequest.EventId);
+        Assert.Equal("cam-1", evidenceRequest.SourceId);
+        Assert.Equal(EvidenceType.Screenshot, evidenceRequest.Type);
     }
 
     [Fact]
-    public void RuleWithoutEvidenceType_DoesNotIncludeEvidenceRequestId()
+    public void RuleWithoutEvidenceType_DoesNotIncludeEvidenceRequest()
     {
         var engine = MakeEngine();
         var t = DateTimeOffset.UtcNow;
@@ -171,6 +174,6 @@ public class RuleEngineTests
 
         var events = engine.Evaluate(ctx, rules);
         Assert.Single(events);
-        Assert.False(events[0].Metadata!.ContainsKey("evidenceRequestId"));
+        Assert.False(events[0].Metadata!.ContainsKey("evidenceRequest"));
     }
 }
